@@ -2,20 +2,29 @@
 
 Cross-platform pre-commit hook system written in Go.
 
+## Supported Languages
+
+| Language | Tools |
+|----------|-------|
+| Go | gofmt, govet, golangci-lint |
+| Node.js | eslint, prettier, npm test |
+| Python | black, flake8, mypy, pytest |
+| Java | checkstyle, spotless, maven |
+| Ruby | rubocop, rspec |
+| Rust | cargo fmt, clippy, cargo test |
+
 ## Features
 
 - Single binary, cross-platform (Windows, macOS, Linux)
 - YAML/JSON configuration
+- Language presets for quick setup
 - Parallel hook execution with dependency ordering
 - Automatic tool download and caching
 - SHA256 checksum verification
 - Glob and regex file filtering
-- Exclude patterns
 - Skip/Only conditions
 - Environment variables support
 - Auto-fix mode
-- Verbose/Quiet output
-- Fail-fast toggle
 
 ## Installation
 
@@ -23,27 +32,22 @@ Cross-platform pre-commit hook system written in Go.
 go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
 ```
 
-Or build from source:
-
-```bash
-git clone https://github.com/ashavijit/hookrunner.git
-cd hookrunner
-go build -o hookrunner ./cmd/hookrunner
-```
-
 ## Quick Start
 
 ```bash
-hookrunner init        # Create sample config
-hookrunner install     # Install git hooks
-git commit -m "test"   # Hooks run automatically
+hookrunner init --lang go     # Create Go config
+hookrunner init --lang nodejs # Create Node.js config
+hookrunner init --lang python # Create Python config
+hookrunner install            # Install git hooks
+git commit -m "test"          # Hooks run automatically
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `init` | Create sample hooks.yaml config |
+| `init --lang <lang>` | Create config with language preset |
+| `presets` | List available language presets |
 | `install` | Install git hooks |
 | `uninstall` | Remove installed hooks |
 | `run <hook>` | Run specified hook |
@@ -70,15 +74,10 @@ SKIP=gofmt git commit                     # Skip specific hooks
 ```yaml
 hooks:
   pre-commit:
-    - name: gofmt
+    - name: format
       tool: go
       args: ["fmt", "./..."]
       files: "\\.go$"
-
-    - name: govet
-      tool: go
-      args: ["vet", "./..."]
-      after: gofmt
 ```
 
 ### Full Example
@@ -101,20 +100,10 @@ hooks:
       fix_args: ["run", "--fix"]
       files: "\\.go$"
       exclude: "_test\\.go$"
-      glob: "*.go"
       timeout: 2m
       after: format
-      skip: CI
-      only: LOCAL
       env:
         GOPROXY: direct
-      pass_env: ["HOME", "PATH"]
-
-  pre-push:
-    - name: test
-      tool: go
-      args: ["test", "./..."]
-      timeout: 5m
 ```
 
 ### Hook Fields
@@ -133,7 +122,6 @@ hooks:
 | `skip` | Skip if env var is set |
 | `only` | Run only if env var is set |
 | `env` | Environment variables |
-| `pass_env` | Forward specific env vars |
 
 ## CI Integration
 

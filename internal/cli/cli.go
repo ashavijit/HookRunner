@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ashavijit/hookrunner/internal/config"
 	"github.com/ashavijit/hookrunner/internal/executor"
 	"github.com/ashavijit/hookrunner/internal/git"
+	"github.com/ashavijit/hookrunner/internal/presets"
 	"github.com/ashavijit/hookrunner/internal/tool"
 	"github.com/ashavijit/hookrunner/internal/version"
 	"github.com/fatih/color"
@@ -23,12 +25,13 @@ var (
 	quiet      bool
 	fix        bool
 	noFailFast bool
+	language   string
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "hookrunner",
 	Short: "Cross-platform pre-commit hook system",
-	Long:  "A cross-platform pre-commit hook system with YAML/JSON configuration",
+	Long:  "A cross-platform pre-commit hook system with YAML/JSON configuration\nSupports: Go, Node.js, Python, Java, Ruby, Rust",
 }
 
 var installCmd = &cobra.Command{
@@ -71,8 +74,15 @@ var doctorCmd = &cobra.Command{
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Create sample config file",
+	Short: "Create config file (use --lang for language preset)",
+	Long:  "Create hooks.yaml config file. Use --lang to specify language:\n  go, nodejs, python, java, ruby, rust",
 	RunE:  runInit,
+}
+
+var presetsCmd = &cobra.Command{
+	Use:   "presets",
+	Short: "List available language presets",
+	Run:   runPresets,
 }
 
 var versionCmd = &cobra.Command{
@@ -90,7 +100,9 @@ func init() {
 	runCmd.Flags().BoolVar(&fix, "fix", false, "Run in fix mode")
 	runCmd.Flags().BoolVar(&noFailFast, "no-fail-fast", false, "Continue on failure")
 
-	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, versionCmd)
+	initCmd.Flags().StringVar(&language, "lang", "", "Language preset (go, nodejs, python, java, ruby, rust)")
+
+	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, presetsCmd, versionCmd)
 }
 
 func Execute() error {
@@ -327,6 +339,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\nVersion: %s\n", version.String())
+	fmt.Printf("Supported: %s\n", strings.Join(presets.AvailableLanguages(), ", "))
 
 	return nil
 }
@@ -342,11 +355,37 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config file already exists: %s", configPath)
 	}
 
-	if err := os.WriteFile(configPath, []byte(config.DefaultConfig()), 0644); err != nil {
+	var configContent string
+	if language != "" {
+		preset, ok := presets.Get(language)
+		if !ok {
+			return fmt.Errorf("unknown language: %s\nAvailable: %s", language, strings.Join(presets.AvailableLanguages(), ", "))
+		}
+		configContent = preset.Config
+		fmt.Printf("Using %s preset\n", preset.Name)
+	} else {
+		configContent = config.DefaultConfig()
+	}
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return fmt.Errorf("failed to create config: %w", err)
 	}
 
 	fmt.Printf("Created %s\n", configPath)
 	fmt.Println("Run 'hookrunner install' to install git hooks")
 	return nil
+}
+
+func runPresets(cmd *cobra.Command, args []string) {
+	fmt.Println("Available Language Presets:")
+	fmt.Println("===========================")
+	fmt.Println()
+
+	for _, lang := range presets.AvailableLanguages() {
+		p, _ := presets.Get(lang)
+		fmt.Printf("  %-10s %s\n", lang, p.Description)
+	}
+
+	fmt.Println()
+	fmt.Println("Usage: hookrunner init --lang <language>")
 }

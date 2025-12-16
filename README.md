@@ -200,16 +200,45 @@ hooks:
 
 ## CI Integration
 
-```yaml
-# GitHub Actions
-- name: Run hooks
-  run: ./hookrunner run pre-commit --all-files
-```
+Since HookRunner is a single binary, just build and run in CI:
+
+### GitHub Actions
 
 ```yaml
-# GitLab CI
-script:
-  - ./hookrunner run pre-commit --all-files
+name: Hooks
+on: [push, pull_request]
+
+jobs:
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build HookRunner
+        run: go build -o hookrunner ./cmd/hookrunner
+
+      - name: Run pre-commit hooks
+        run: ./hookrunner run pre-commit --all-files
+```
+
+### GitLab CI
+
+```yaml
+hooks:
+  image: golang:1.21
+  script:
+    - go build -o hookrunner ./cmd/hookrunner
+    - ./hookrunner run pre-commit --all-files
+```
+
+### Or use go run directly
+
+```yaml
+# No binary needed
+- run: go run ./cmd/hookrunner run pre-commit --all-files
 ```
 
 ## Test Coverage

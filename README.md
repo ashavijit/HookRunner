@@ -1,30 +1,65 @@
+<div align="center">
+
 # HookRunner
 
-Cross-platform pre-commit hook system written in Go.
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ashavijit/hookrunner)](https://goreportcard.com/report/github.com/ashavijit/hookrunner)
+[![Coverage](https://img.shields.io/badge/coverage-75%25-brightgreen)](https://github.com/ashavijit/hookrunner)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ashavijit/hookrunner/pulls)
+
+**Cross-platform pre-commit hook system with DAG execution and policy engine**
+
+[Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [Documentation](#configuration) • [Contributing](#contributing)
+
+</div>
+
+---
+
+## Why HookRunner?
+
+> *"We model hooks as a DAG to ensure deterministic execution with maximal parallelism."*
+
+| Feature | pre-commit | Husky | Lefthook | **HookRunner** |
+|---------|------------|-------|----------|----------------|
+| Single Binary | ❌ | ❌ | ✅ | ✅ |
+| Policy Engine | ❌ | ❌ | ❌ | ✅ |
+| DAG Execution | ❌ | ❌ | ❌ | ✅ |
+| Multi-language | ✅ | ❌ | ✅ | ✅ |
+| Cross-platform | ❌ | ❌ | ✅ | ✅ |
 
 ## Supported Languages
 
 | Language | Tools |
 |----------|-------|
-| Go | gofmt, govet, golangci-lint |
-| Node.js | eslint, prettier, npm test |
-| Python | black, flake8, mypy, pytest |
-| Java | checkstyle, spotless, maven |
-| Ruby | rubocop, rspec |
-| Rust | cargo fmt, clippy, cargo test |
+| 🐹 Go | gofmt, govet, golangci-lint |
+| 🟢 Node.js | eslint, prettier, npm test |
+| 🐍 Python | black, flake8, mypy, pytest |
+| ☕ Java | checkstyle, spotless, maven |
+| 💎 Ruby | rubocop, rspec |
+| 🦀 Rust | cargo fmt, clippy, cargo test |
 
 ## Features
 
-- Single binary, cross-platform (Windows, macOS, Linux)
-- YAML/JSON configuration
-- **DAG Execution Engine** - deterministic hook ordering with maximal parallelism
-- **Policy Engine** - enforce org rules at commit time
-- Language presets for quick setup
-- Automatic tool download and caching
-- Glob and regex file filtering
-- Skip/Only conditions
+- **DAG Execution Engine** - Deterministic hook ordering with maximal parallelism
+- **Policy Engine** - Enforce org rules (max files, forbidden dirs, commit message format)
+- **Single Binary** - Cross-platform (Windows, macOS, Linux)
+- **YAML/JSON Config** - Simple, declarative configuration
+- **Language Presets** - Quick setup for Go, Node.js, Python, Java, Ruby, Rust
+- **Auto-fix Mode** - Automatic code formatting
+- **Tool Management** - Auto-download and cache tools
 
 ## Installation
+
+### From Source
+
+```bash
+git clone https://github.com/ashavijit/hookrunner.git
+cd hookrunner
+go build -o hookrunner ./cmd/hookrunner
+```
+
+### Go Install
 
 ```bash
 go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
@@ -33,9 +68,14 @@ go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
 ## Quick Start
 
 ```bash
-hookrunner init --lang go     # Create Go config
-hookrunner install            # Install git hooks
-git commit -m "feat: test"    # Hooks run automatically
+# Initialize with language preset
+hookrunner init --lang go
+
+# Install git hooks
+hookrunner install
+
+# Commit triggers hooks automatically
+git commit -m "feat: add new feature"
 ```
 
 ## DAG Execution Engine
@@ -45,23 +85,22 @@ Hooks are modeled as a dependency graph for deterministic execution:
 ```yaml
 hooks:
   pre-commit:
-    - name: format
-    - name: lint
-      after: format
+    - name: format     # ──┐
+    - name: lint       #   ├──▶ runs in parallel
+    - name: security   # ──┘
     - name: test
-      after: lint
+      after: lint      # runs after lint completes
 ```
 
-Execution flow:
 ```
-format ──▶ lint ──▶ test
-```
-
-Parallel hooks run concurrently:
-```yaml
-- name: lint      # ─┐
-- name: security  # ─┼──▶ runs in parallel
-- name: format    # ─┘
+┌────────┐   ┌────────┐   ┌──────────┐
+│ format │   │  lint  │   │ security │   Level 1 (parallel)
+└────────┘   └───┬────┘   └──────────┘
+                 │
+                 ▼
+            ┌────────┐
+            │  test  │                    Level 2
+            └────────┘
 ```
 
 ## Policy Engine
@@ -72,14 +111,13 @@ Enforce organizational rules at commit time:
 policies:
   max_files_changed: 20
   forbid_directories: ["vendor/", "generated/"]
-  forbid_files: ["\\.env$"]
   commit_message:
     regex: "^(feat|fix|chore|docs|refactor|test):"
     min_length: 10
     max_length: 72
 ```
 
-Policy violations block the commit:
+**Output on violation:**
 ```
 [FAIL] policies
   - [max_files_changed] too many files changed: 25 (max: 20)
@@ -100,7 +138,7 @@ Policy violations block the commit:
 | `doctor` | Diagnose setup |
 | `version` | Show version |
 
-## Flags
+## CLI Flags
 
 ```bash
 hookrunner run pre-commit --all-files     # Run on all files
@@ -110,7 +148,9 @@ hookrunner run pre-commit --no-fail-fast  # Continue on failure
 SKIP=gofmt git commit                     # Skip specific hooks
 ```
 
-## Full Configuration
+## Configuration
+
+### Full Example
 
 ```yaml
 tools:
@@ -143,16 +183,66 @@ hooks:
         GOPROXY: direct
 ```
 
+### Hook Fields
+
+| Field | Description |
+|-------|-------------|
+| `name` | Hook identifier |
+| `tool` | Command or tool name |
+| `args` | Arguments to pass |
+| `fix_args` | Arguments for --fix mode |
+| `files` | Regex pattern to match files |
+| `exclude` | Regex to exclude files |
+| `timeout` | Execution timeout |
+| `after` | Dependency on another hook |
+| `skip` | Skip if env var is set |
+| `env` | Environment variables |
+
+## CI Integration
+
+```yaml
+# GitHub Actions
+- name: Run hooks
+  run: ./hookrunner run pre-commit --all-files
+```
+
+```yaml
+# GitLab CI
+script:
+  - ./hookrunner run pre-commit --all-files
+```
+
 ## Test Coverage
 
-```bash
-go test ./... -v
-# 27 tests passing
-# - config: 8 tests
-# - dag: 8 tests
-# - policy: 11 tests
 ```
+Package     Coverage
+─────────────────────
+dag         100.0%
+presets     100.0%
+version     100.0%
+config       85.7%
+git          80.4%
+policy       69.8%
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+Made with ❤️ by [ashavijit](https://github.com/ashavijit)
+
+</div>

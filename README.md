@@ -17,14 +17,12 @@ Cross-platform pre-commit hook system written in Go.
 
 - Single binary, cross-platform (Windows, macOS, Linux)
 - YAML/JSON configuration
+- **DAG Execution Engine** - deterministic hook ordering with maximal parallelism
+- **Policy Engine** - enforce org rules at commit time
 - Language presets for quick setup
-- Parallel hook execution with dependency ordering
 - Automatic tool download and caching
-- SHA256 checksum verification
 - Glob and regex file filtering
 - Skip/Only conditions
-- Environment variables support
-- Auto-fix mode
 
 ## Installation
 
@@ -36,10 +34,56 @@ go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
 
 ```bash
 hookrunner init --lang go     # Create Go config
-hookrunner init --lang nodejs # Create Node.js config
-hookrunner init --lang python # Create Python config
 hookrunner install            # Install git hooks
-git commit -m "test"          # Hooks run automatically
+git commit -m "feat: test"    # Hooks run automatically
+```
+
+## DAG Execution Engine
+
+Hooks are modeled as a dependency graph for deterministic execution:
+
+```yaml
+hooks:
+  pre-commit:
+    - name: format
+    - name: lint
+      after: format
+    - name: test
+      after: lint
+```
+
+Execution flow:
+```
+format ──▶ lint ──▶ test
+```
+
+Parallel hooks run concurrently:
+```yaml
+- name: lint      # ─┐
+- name: security  # ─┼──▶ runs in parallel
+- name: format    # ─┘
+```
+
+## Policy Engine
+
+Enforce organizational rules at commit time:
+
+```yaml
+policies:
+  max_files_changed: 20
+  forbid_directories: ["vendor/", "generated/"]
+  forbid_files: ["\\.env$"]
+  commit_message:
+    regex: "^(feat|fix|chore|docs|refactor|test):"
+    min_length: 10
+    max_length: 72
+```
+
+Policy violations block the commit:
+```
+[FAIL] policies
+  - [max_files_changed] too many files changed: 25 (max: 20)
+  - [commit_message.regex] commit message does not match pattern
 ```
 
 ## Commands
@@ -61,26 +105,12 @@ git commit -m "test"          # Hooks run automatically
 ```bash
 hookrunner run pre-commit --all-files     # Run on all files
 hookrunner run pre-commit --verbose       # Detailed output
-hookrunner run pre-commit --quiet         # Minimal output
 hookrunner run pre-commit --fix           # Auto-fix mode
 hookrunner run pre-commit --no-fail-fast  # Continue on failure
 SKIP=gofmt git commit                     # Skip specific hooks
 ```
 
-## Configuration
-
-### Basic Example
-
-```yaml
-hooks:
-  pre-commit:
-    - name: format
-      tool: go
-      args: ["fmt", "./..."]
-      files: "\\.go$"
-```
-
-### Full Example
+## Full Configuration
 
 ```yaml
 tools:
@@ -89,44 +119,38 @@ tools:
     install:
       windows: https://...zip
       linux: https://...tar.gz
-      darwin: https://...tar.gz
-    checksum: "sha256hash"
+    checksum: "sha256..."
+
+policies:
+  max_files_changed: 20
+  forbid_directories: ["vendor/"]
+  commit_message:
+    regex: "^(feat|fix|chore):"
 
 hooks:
   pre-commit:
+    - name: format
+      tool: go
+      args: ["fmt", "./..."]
+      files: "\\.go$"
+
     - name: lint
       tool: golangci-lint
       args: ["run"]
-      fix_args: ["run", "--fix"]
-      files: "\\.go$"
-      exclude: "_test\\.go$"
-      timeout: 2m
       after: format
+      timeout: 2m
       env:
         GOPROXY: direct
 ```
 
-### Hook Fields
-
-| Field | Description |
-|-------|-------------|
-| `name` | Hook identifier |
-| `tool` | Command or tool name |
-| `args` | Arguments to pass |
-| `fix_args` | Arguments for --fix mode |
-| `files` | Regex pattern to match files |
-| `glob` | Glob pattern for files |
-| `exclude` | Regex to exclude files |
-| `timeout` | Execution timeout |
-| `after` | Dependency on another hook |
-| `skip` | Skip if env var is set |
-| `only` | Run only if env var is set |
-| `env` | Environment variables |
-
-## CI Integration
+## Test Coverage
 
 ```bash
-./hookrunner run pre-commit --all-files
+go test ./... -v
+# 27 tests passing
+# - config: 8 tests
+# - dag: 8 tests
+# - policy: 11 tests
 ```
 
 ## License

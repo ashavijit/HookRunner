@@ -32,9 +32,24 @@ type Hook struct {
 	FailFast bool              `yaml:"fail_fast" json:"fail_fast"`
 }
 
+type CommitMessagePolicy struct {
+	Regex     string `yaml:"regex" json:"regex"`
+	MaxLength int    `yaml:"max_length" json:"max_length"`
+	MinLength int    `yaml:"min_length" json:"min_length"`
+}
+
+type Policies struct {
+	MaxFilesChanged   int                 `yaml:"max_files_changed" json:"max_files_changed"`
+	ForbidDirectories []string            `yaml:"forbid_directories" json:"forbid_directories"`
+	ForbidFiles       []string            `yaml:"forbid_files" json:"forbid_files"`
+	RequireFiles      []string            `yaml:"require_files" json:"require_files"`
+	CommitMessage     CommitMessagePolicy `yaml:"commit_message" json:"commit_message"`
+}
+
 type Config struct {
-	Tools map[string]Tool   `yaml:"tools" json:"tools"`
-	Hooks map[string][]Hook `yaml:"hooks" json:"hooks"`
+	Tools    map[string]Tool   `yaml:"tools" json:"tools"`
+	Hooks    map[string][]Hook `yaml:"hooks" json:"hooks"`
+	Policies *Policies         `yaml:"policies" json:"policies"`
 }
 
 func Load(dir string) (*Config, string, error) {
@@ -98,6 +113,13 @@ func DefaultConfig() string {
       windows: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-windows-amd64.zip
       linux: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-linux-amd64.tar.gz
       darwin: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-darwin-amd64.tar.gz
+
+policies:
+  max_files_changed: 50
+  forbid_directories: ["vendor/", "generated/"]
+  commit_message:
+    regex: "^(feat|fix|chore|docs|refactor|test):"
+    min_length: 10
 
 hooks:
   pre-commit:

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/ashavijit/hookrunner/internal/config"
+	"github.com/ashavijit/hookrunner/internal/dag"
+	"github.com/ashavijit/hookrunner/internal/policy"
 	"github.com/ashavijit/hookrunner/internal/tool"
 	"github.com/fatih/color"
 )
@@ -31,6 +33,7 @@ type Options struct {
 	Fix       bool
 	FailFast  bool
 	SkipHooks []string
+	CommitMsg string
 }
 
 type Executor struct {
@@ -59,11 +62,20 @@ func (e *Executor) Run(hookType string, files []string, allFiles bool) []Result 
 		return nil
 	}
 
-	ordered := e.orderHooks(hooks)
+	graph := dag.BuildGraph(hooks)
+	if graph.HasCycle() {
+		return []Result{{
+			Name:    "dag",
+			Success: false,
+			Error:   fmt.Errorf("circular dependency detected in hook graph"),
+		}}
+	}
+
+	executionPlan := graph.GetExecutionPlan()
 	var results []Result
 	failed := false
 
-	for _, batch := range ordered {
+	for _, batch := range executionPlan {
 		if failed && e.opts.FailFast {
 			break
 		}
@@ -83,51 +95,25 @@ func (e *Executor) Run(hookType string, files []string, allFiles bool) []Result 
 	return results
 }
 
-func (e *Executor) orderHooks(hooks []config.Hook) [][]config.Hook {
-	var independent []config.Hook
-	dependent := make(map[string][]config.Hook)
-
-	for _, h := range hooks {
-		if h.After == "" {
-			independent = append(independent, h)
-		} else {
-			dependent[h.After] = append(dependent[h.After], h)
-		}
+func (e *Executor) CheckPolicies(files []string, commitMsg string) *policy.PolicyResult {
+	if e.config.Policies == nil {
+		return nil
 	}
 
-	var ordered [][]config.Hook
-	if len(independent) > 0 {
-		ordered = append(ordered, independent)
+	policies := &policy.Policies{
+		MaxFilesChanged:   e.config.Policies.MaxFilesChanged,
+		ForbidDirectories: e.config.Policies.ForbidDirectories,
+		ForbidFiles:       e.config.Policies.ForbidFiles,
+		RequireFiles:      e.config.Policies.RequireFiles,
+		CommitMessage: policy.CommitMessagePolicy{
+			Regex:     e.config.Policies.CommitMessage.Regex,
+			MaxLength: e.config.Policies.CommitMessage.MaxLength,
+			MinLength: e.config.Policies.CommitMessage.MinLength,
+		},
 	}
 
-	for len(dependent) > 0 {
-		var nextBatch []config.Hook
-		for after, deps := range dependent {
-			found := false
-			for _, batch := range ordered {
-				for _, h := range batch {
-					if h.Name == after {
-						found = true
-						break
-					}
-				}
-				if found {
-					break
-				}
-			}
-			if found {
-				nextBatch = append(nextBatch, deps...)
-				delete(dependent, after)
-			}
-		}
-		if len(nextBatch) > 0 {
-			ordered = append(ordered, nextBatch)
-		} else {
-			break
-		}
-	}
-
-	return ordered
+	result := policy.Evaluate(policies, files, commitMsg)
+	return &result
 }
 
 func (e *Executor) runBatch(hooks []config.Hook, files []string, allFiles bool) []Result {
@@ -310,6 +296,24 @@ func PrintResults(results []Result, verbose bool, quiet bool) {
 			if r.Output != "" {
 				fmt.Printf("  Output:\n%s\n", indent(r.Output))
 			}
+		}
+	}
+}
+
+func PrintPolicyResult(result *policy.PolicyResult, quiet bool) {
+	if quiet || result == nil {
+		return
+	}
+
+	green := color.New(color.FgGreen).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()
+
+	if result.Passed {
+		fmt.Printf("%s policies\n", green("[PASS]"))
+	} else {
+		fmt.Printf("%s policies\n", red("[FAIL]"))
+		for _, v := range result.Violations {
+			fmt.Printf("  - [%s] %s\n", v.Rule, v.Message)
 		}
 	}
 }

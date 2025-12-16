@@ -9,8 +9,13 @@ Cross-platform pre-commit hook system written in Go.
 - Parallel hook execution with dependency ordering
 - Automatic tool download and caching
 - SHA256 checksum verification
-- Smart file filtering for staged files
-- Timeout support
+- Glob and regex file filtering
+- Exclude patterns
+- Skip/Only conditions
+- Environment variables support
+- Auto-fix mode
+- Verbose/Quiet output
+- Fail-fast toggle
 
 ## Installation
 
@@ -26,21 +31,43 @@ cd hookrunner
 go build -o hookrunner ./cmd/hookrunner
 ```
 
-## Usage
+## Quick Start
 
-### Initialize Configuration
+```bash
+hookrunner init        # Create sample config
+hookrunner install     # Install git hooks
+git commit -m "test"   # Hooks run automatically
+```
 
-Create a `hooks.yaml` in your repository root:
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `init` | Create sample hooks.yaml config |
+| `install` | Install git hooks |
+| `uninstall` | Remove installed hooks |
+| `run <hook>` | Run specified hook |
+| `run-cmd <tool>` | Run a tool directly |
+| `list` | List configured hooks |
+| `doctor` | Diagnose setup |
+| `version` | Show version |
+
+## Flags
+
+```bash
+hookrunner run pre-commit --all-files     # Run on all files
+hookrunner run pre-commit --verbose       # Detailed output
+hookrunner run pre-commit --quiet         # Minimal output
+hookrunner run pre-commit --fix           # Auto-fix mode
+hookrunner run pre-commit --no-fail-fast  # Continue on failure
+SKIP=gofmt git commit                     # Skip specific hooks
+```
+
+## Configuration
+
+### Basic Example
 
 ```yaml
-tools:
-  golangci-lint:
-    version: 1.55.2
-    install:
-      windows: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-windows-amd64.zip
-      linux: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-linux-amd64.tar.gz
-      darwin: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-darwin-amd64.tar.gz
-
 hooks:
   pre-commit:
     - name: gofmt
@@ -51,52 +78,67 @@ hooks:
     - name: govet
       tool: go
       args: ["vet", "./..."]
-      files: "\\.go$"
       after: gofmt
 ```
 
-### Commands
-
-```bash
-hookrunner install              # Install git hooks
-hookrunner run pre-commit       # Run pre-commit hooks on staged files
-hookrunner run pre-commit --all-files  # Run on all files
-hookrunner list                 # List configured hooks
-hookrunner doctor               # Diagnose setup
-```
-
-### CI Integration
-
-```bash
-./hookrunner run pre-commit --all-files
-```
-
-## Configuration Reference
-
-### Tools
+### Full Example
 
 ```yaml
 tools:
-  tool-name:
-    version: "1.0.0"
+  golangci-lint:
+    version: 1.55.2
     install:
-      windows: https://...
-      linux: https://...
-      darwin: https://...
-    checksum: "sha256hash"  # optional
+      windows: https://...zip
+      linux: https://...tar.gz
+      darwin: https://...tar.gz
+    checksum: "sha256hash"
+
+hooks:
+  pre-commit:
+    - name: lint
+      tool: golangci-lint
+      args: ["run"]
+      fix_args: ["run", "--fix"]
+      files: "\\.go$"
+      exclude: "_test\\.go$"
+      glob: "*.go"
+      timeout: 2m
+      after: format
+      skip: CI
+      only: LOCAL
+      env:
+        GOPROXY: direct
+      pass_env: ["HOME", "PATH"]
+
+  pre-push:
+    - name: test
+      tool: go
+      args: ["test", "./..."]
+      timeout: 5m
 ```
 
-### Hooks
+### Hook Fields
 
-```yaml
-hooks:
-  pre-commit:  # or pre-push, commit-msg
-    - name: hook-name
-      tool: tool-name  # name from tools section or system command
-      args: ["arg1", "arg2"]
-      files: "\\.go$"  # regex to filter files
-      timeout: 2m      # optional timeout
-      after: other-hook  # dependency ordering
+| Field | Description |
+|-------|-------------|
+| `name` | Hook identifier |
+| `tool` | Command or tool name |
+| `args` | Arguments to pass |
+| `fix_args` | Arguments for --fix mode |
+| `files` | Regex pattern to match files |
+| `glob` | Glob pattern for files |
+| `exclude` | Regex to exclude files |
+| `timeout` | Execution timeout |
+| `after` | Dependency on another hook |
+| `skip` | Skip if env var is set |
+| `only` | Run only if env var is set |
+| `env` | Environment variables |
+| `pass_env` | Forward specific env vars |
+
+## CI Integration
+
+```bash
+./hookrunner run pre-commit --all-files
 ```
 
 ## License

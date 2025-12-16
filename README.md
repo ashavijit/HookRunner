@@ -200,7 +200,7 @@ hooks:
 
 ## CI Integration
 
-Since HookRunner is a single binary, just build and run in CI:
+Users install hookrunner in their CI pipeline:
 
 ### GitHub Actions
 
@@ -217,11 +217,13 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build HookRunner
-        run: go build -o hookrunner ./cmd/hookrunner
+      # Install hookrunner
+      - name: Install HookRunner
+        run: go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
 
+      # Run hooks (uses your project's hooks.yaml)
       - name: Run pre-commit hooks
-        run: ./hookrunner run pre-commit --all-files
+        run: hookrunner run pre-commit --all-files
 ```
 
 ### GitLab CI
@@ -230,15 +232,19 @@ jobs:
 hooks:
   image: golang:1.21
   script:
-    - go build -o hookrunner ./cmd/hookrunner
-    - ./hookrunner run pre-commit --all-files
+    - go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
+    - hookrunner run pre-commit --all-files
 ```
 
-### Or use go run directly
+### Using curl (no Go required)
 
 ```yaml
-# No binary needed
-- run: go run ./cmd/hookrunner run pre-commit --all-files
+# Download pre-built binary
+- name: Install HookRunner
+  run: |
+    curl -sSL https://github.com/ashavijit/hookrunner/releases/latest/download/hookrunner-linux-amd64 -o hookrunner
+    chmod +x hookrunner
+    ./hookrunner run pre-commit --all-files
 ```
 
 ## Test Coverage

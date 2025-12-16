@@ -7,7 +7,7 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 
-echo "Building hookrunner $VERSION..."
+echo "Building hookrunner $VERSION for all platforms..."
 
 LDFLAGS="-s -w -X github.com/ashavijit/hookrunner/internal/version.Version=${VERSION#v} -X github.com/ashavijit/hookrunner/internal/version.GitCommit=$(git rev-parse --short HEAD) -X github.com/ashavijit/hookrunner/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -16,9 +16,16 @@ mkdir -p dist
 platforms=(
   "linux/amd64"
   "linux/arm64"
+  "linux/386"
   "darwin/amd64"
   "darwin/arm64"
   "windows/amd64"
+  "windows/386"
+  "windows/arm64"
+  "freebsd/amd64"
+  "freebsd/arm64"
+  "openbsd/amd64"
+  "netbsd/amd64"
 )
 
 for platform in "${platforms[@]}"; do
@@ -38,5 +45,13 @@ cd dist
 sha256sum hookrunner-* > checksums.txt
 cd ..
 
-echo "Done! Binaries in dist/"
+echo ""
+echo "Done! Built for:"
+echo "  - Linux (amd64, arm64, 386)"
+echo "  - macOS (amd64, arm64)"
+echo "  - Windows (amd64, 386, arm64)"
+echo "  - FreeBSD (amd64, arm64)"
+echo "  - OpenBSD (amd64)"
+echo "  - NetBSD (amd64)"
+echo ""
 ls -la dist/

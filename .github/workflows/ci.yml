@@ -42,24 +42,75 @@ jobs:
           version: latest
 
   release:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     needs: [test, lint]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.21'
 
-      - name: Build binaries
+      - name: Get version
+        id: version
         run: |
-          chmod +x scripts/release.sh
-          ./scripts/release.sh ${{ github.ref_name }}
+          VERSION="v0.$(git rev-list --count HEAD).0"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
-      - name: Release
+      - name: Build all platforms
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          LDFLAGS="-s -w -X github.com/ashavijit/hookrunner/internal/version.Version=${VERSION#v} -X github.com/ashavijit/hookrunner/internal/version.GitCommit=$(git rev-parse --short HEAD) -X github.com/ashavijit/hookrunner/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          mkdir -p dist
+
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/hookrunner-linux-amd64 ./cmd/hookrunner
+          GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/hookrunner-linux-arm64 ./cmd/hookrunner
+          GOOS=linux GOARCH=386 go build -ldflags "$LDFLAGS" -o dist/hookrunner-linux-386 ./cmd/hookrunner
+
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/hookrunner-darwin-amd64 ./cmd/hookrunner
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/hookrunner-darwin-arm64 ./cmd/hookrunner
+
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/hookrunner-windows-amd64.exe ./cmd/hookrunner
+          GOOS=windows GOARCH=386 go build -ldflags "$LDFLAGS" -o dist/hookrunner-windows-386.exe ./cmd/hookrunner
+          GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/hookrunner-windows-arm64.exe ./cmd/hookrunner
+
+          # FreeBSD
+          GOOS=freebsd GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/hookrunner-freebsd-amd64 ./cmd/hookrunner
+
+          # Create checksums
+          cd dist
+          sha256sum hookrunner-* > checksums.txt
+
+          echo "Built binaries:"
+          ls -la
+
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## HookRunner ${{ steps.version.outputs.version }}
+
+            ### Installation
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/ashavijit/hookrunner/master/scripts/install.sh | bash
+            ```
+
+            Or download binary for your platform below.
           files: dist/*
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

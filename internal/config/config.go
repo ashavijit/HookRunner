@@ -16,12 +16,20 @@ type Tool struct {
 }
 
 type Hook struct {
-	Name    string   `yaml:"name" json:"name"`
-	Tool    string   `yaml:"tool" json:"tool"`
-	Args    []string `yaml:"args" json:"args"`
-	Files   string   `yaml:"files" json:"files"`
-	Timeout string   `yaml:"timeout" json:"timeout"`
-	After   string   `yaml:"after" json:"after"`
+	Name     string            `yaml:"name" json:"name"`
+	Tool     string            `yaml:"tool" json:"tool"`
+	Args     []string          `yaml:"args" json:"args"`
+	FixArgs  []string          `yaml:"fix_args" json:"fix_args"`
+	Files    string            `yaml:"files" json:"files"`
+	Glob     string            `yaml:"glob" json:"glob"`
+	Exclude  string            `yaml:"exclude" json:"exclude"`
+	Timeout  string            `yaml:"timeout" json:"timeout"`
+	After    string            `yaml:"after" json:"after"`
+	Skip     string            `yaml:"skip" json:"skip"`
+	Only     string            `yaml:"only" json:"only"`
+	Env      map[string]string `yaml:"env" json:"env"`
+	PassEnv  []string          `yaml:"pass_env" json:"pass_env"`
+	FailFast bool              `yaml:"fail_fast" json:"fail_fast"`
 }
 
 type Config struct {
@@ -80,4 +88,34 @@ func (c *Config) GetTool(name string) *Tool {
 		return &tool
 	}
 	return nil
+}
+
+func DefaultConfig() string {
+	return `tools:
+  golangci-lint:
+    version: 1.55.2
+    install:
+      windows: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-windows-amd64.zip
+      linux: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-linux-amd64.tar.gz
+      darwin: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-darwin-amd64.tar.gz
+
+hooks:
+  pre-commit:
+    - name: gofmt
+      tool: go
+      args: ["fmt", "./..."]
+      files: "\\.go$"
+
+    - name: govet
+      tool: go
+      args: ["vet", "./..."]
+      files: "\\.go$"
+      after: gofmt
+
+  pre-push:
+    - name: test
+      tool: go
+      args: ["test", "./..."]
+      timeout: 5m
+`
 }

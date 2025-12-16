@@ -34,6 +34,23 @@ func GetStagedFiles() ([]string, error) {
 	return files, nil
 }
 
+func GetAllFiles() ([]string, error) {
+	cmd := exec.Command("git", "ls-files")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get files: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var files []string
+	for _, line := range lines {
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+	return files, nil
+}
+
 func InstallHook(hookType string, binaryPath string) error {
 	repoRoot, err := FindRepoRoot()
 	if err != nil {
@@ -53,6 +70,24 @@ exec "%s" run %s
 
 	if err := os.WriteFile(hookPath, []byte(content), 0755); err != nil {
 		return fmt.Errorf("failed to write hook: %w", err)
+	}
+
+	return nil
+}
+
+func UninstallHook(hookType string) error {
+	repoRoot, err := FindRepoRoot()
+	if err != nil {
+		return err
+	}
+
+	hookPath := filepath.Join(repoRoot, ".git", "hooks", hookType)
+	if _, err := os.Stat(hookPath); os.IsNotExist(err) {
+		return nil
+	}
+
+	if err := os.Remove(hookPath); err != nil {
+		return fmt.Errorf("failed to remove hook: %w", err)
 	}
 
 	return nil

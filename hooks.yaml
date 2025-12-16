@@ -12,6 +12,7 @@ hooks:
       tool: go
       args: ["fmt", "./..."]
       files: "\\.go$"
+      exclude: "_test\\.go$"
 
     - name: govet
       tool: go
@@ -24,3 +25,5 @@ hooks:
       tool: go
       args: ["test", "./..."]
       timeout: 5m
+      env:
+        CGO_ENABLED: "0"

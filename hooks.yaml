@@ -1,0 +1,26 @@
+tools:
+  golangci-lint:
+    version: 1.55.2
+    install:
+      windows: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-windows-amd64.zip
+      linux: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-linux-amd64.tar.gz
+      darwin: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-darwin-amd64.tar.gz
+
+hooks:
+  pre-commit:
+    - name: gofmt
+      tool: go
+      args: ["fmt", "./..."]
+      files: "\\.go$"
+
+    - name: govet
+      tool: go
+      args: ["vet", "./..."]
+      files: "\\.go$"
+      after: gofmt
+
+  pre-push:
+    - name: test
+      tool: go
+      args: ["test", "./..."]
+      timeout: 5m

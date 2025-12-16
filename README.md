@@ -51,18 +51,24 @@
 
 ## Installation
 
-### From Source
+### Quick Install (Linux/macOS)
 
 ```bash
-git clone https://github.com/ashavijit/hookrunner.git
-cd hookrunner
-go build -o hookrunner ./cmd/hookrunner
+curl -sSL https://raw.githubusercontent.com/ashavijit/hookrunner/master/scripts/install.sh | bash
 ```
 
 ### Go Install
 
 ```bash
 go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
+```
+
+### From Source
+
+```bash
+git clone https://github.com/ashavijit/hookrunner.git
+cd hookrunner
+go build -o hookrunner ./cmd/hookrunner
 ```
 
 ## Quick Start

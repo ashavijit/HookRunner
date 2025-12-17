@@ -1,0 +1,29 @@
+tools: {}
+
+hooks:
+  pre-commit:
+    - name: test-run-echo
+      run: "echo Run command works!"
+
+    - name: test-script-ps1
+      script: test-script.ps1
+
+    - name: test-root-dir
+      run: "echo Current dir is %CD%"
+      root: subdir/
+
+    - name: test-tags-frontend
+      run: "echo Frontend hook"
+      tags: [frontend, js]
+
+    - name: test-tags-backend
+      run: "echo Backend hook"
+      tags: [backend, go]
+
+    - name: test-tags-security
+      run: "echo Security check"
+      tags: [security]
+
+  pre-push:
+    - name: test-push
+      run: "echo Pre-push hook"

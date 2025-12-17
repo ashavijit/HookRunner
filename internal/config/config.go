@@ -80,6 +80,7 @@ type Policies struct {
 	Type          string        `yaml:"type" json:"type"`
 	Policies      []PolicyRef   `yaml:"policies" json:"policies"`
 	LocalPolicies []LocalPolicy `yaml:"localPolicies" json:"localPolicies"`
+	LuaScripts    []string      `yaml:"lua_scripts" json:"lua_scripts"`
 }
 
 type Config struct {

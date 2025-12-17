@@ -13,6 +13,7 @@ import (
 
 	"github.com/ashavijit/hookrunner/internal/config"
 	"github.com/ashavijit/hookrunner/internal/dag"
+	luapkg "github.com/ashavijit/hookrunner/internal/lua"
 	"github.com/ashavijit/hookrunner/internal/policy"
 	"github.com/ashavijit/hookrunner/internal/tool"
 	"github.com/fatih/color"
@@ -217,6 +218,31 @@ func (e *Executor) CheckPolicies(files []string, commitMsg string) *policy.EvalR
 	}
 
 	result := policy.Evaluate(&merged.EffectiveRules, files, commitMsg)
+
+	if len(p.LuaScripts) > 0 {
+		luaRunner := luapkg.NewRunner(e.workDir)
+		for _, script := range p.LuaScripts {
+			scriptPath := filepath.Join(e.workDir, script)
+			luaResults, err := luaRunner.RunPolicy(scriptPath, files)
+			if err != nil {
+				result.Violations = append(result.Violations, policy.Violation{
+					Rule:    "lua_script",
+					Message: fmt.Sprintf("Lua error in %s: %v", script, err),
+				})
+				continue
+			}
+			for _, lr := range luaResults {
+				if !lr.Passed {
+					result.Violations = append(result.Violations, policy.Violation{
+						Rule:    "lua_policy",
+						Message: lr.Message,
+					})
+				}
+			}
+		}
+		result.Passed = len(result.Violations) == 0
+	}
+
 	return &result
 }
 

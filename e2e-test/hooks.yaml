@@ -1,0 +1,10 @@
+tools: {}
+
+policies:
+  lua_scripts:
+    - .hooks/policies/no-console.lua
+
+hooks:
+  pre-commit:
+    - name: echo-test
+      run: "echo Hello from hook"

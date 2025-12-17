@@ -13,6 +13,7 @@ import (
 
 	"github.com/ashavijit/hookrunner/internal/config"
 	"github.com/ashavijit/hookrunner/internal/dag"
+	"github.com/ashavijit/hookrunner/internal/git"
 	"github.com/ashavijit/hookrunner/internal/policy"
 	"github.com/ashavijit/hookrunner/internal/tool"
 	"github.com/fatih/color"
@@ -483,6 +484,10 @@ func PrintResults(results []Result, verbose bool, quiet bool) {
 			}
 			if r.Output != "" {
 				fmt.Printf("  Output:\n%s\n", indent(r.Output))
+				blameInfo := extractAndBlame(r.Output)
+				if blameInfo != "" {
+					fmt.Printf("  %s\n", cyan(blameInfo))
+				}
 			}
 		}
 	}
@@ -546,4 +551,43 @@ func ParseSkipEnv() []string {
 		return nil
 	}
 	return strings.Split(skip, ",")
+}
+
+func extractAndBlame(output string) string {
+	re := regexp.MustCompile(`([a-zA-Z0-9_\-./\\]+\.(go|js|ts|py|rb|java|c|cpp|rs)):(\d+)`)
+	matches := re.FindAllStringSubmatch(output, 3)
+
+	if len(matches) == 0 {
+		return ""
+	}
+
+	var blames []string
+	seen := make(map[string]bool)
+
+	for _, match := range matches {
+		file := match[1]
+		lineStr := match[3]
+		key := file + ":" + lineStr
+
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		line := 0
+		fmt.Sscanf(lineStr, "%d", &line)
+
+		info, err := git.GetBlame(file, line)
+		if err != nil {
+			continue
+		}
+
+		blames = append(blames, git.FormatBlame(info))
+	}
+
+	if len(blames) == 0 {
+		return ""
+	}
+
+	return strings.Join(blames, "\n  ")
 }

@@ -102,3 +102,52 @@ func IsInsideWorkTree() bool {
 	}
 	return strings.TrimSpace(string(out)) == "true"
 }
+
+type BlameInfo struct {
+	Author  string
+	Email   string
+	Date    string
+	Commit  string
+	Summary string
+	Line    int
+	Content string
+}
+
+func GetBlame(file string, line int) (*BlameInfo, error) {
+	lineRange := fmt.Sprintf("%d,%d", line, line)
+	cmd := exec.Command("git", "blame", "-L", lineRange, "--porcelain", file)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	info := &BlameInfo{Line: line}
+	lines := strings.Split(string(out), "\n")
+
+	for _, l := range lines {
+		switch {
+		case strings.HasPrefix(l, "author "):
+			info.Author = strings.TrimPrefix(l, "author ")
+		case strings.HasPrefix(l, "author-mail "):
+			info.Email = strings.Trim(strings.TrimPrefix(l, "author-mail "), "<>")
+		case strings.HasPrefix(l, "author-time "):
+			info.Date = strings.TrimPrefix(l, "author-time ")
+		case strings.HasPrefix(l, "summary "):
+			info.Summary = strings.TrimPrefix(l, "summary ")
+		case len(l) == 40:
+			info.Commit = l[:8]
+		case strings.HasPrefix(l, "\t"):
+			info.Content = strings.TrimPrefix(l, "\t")
+		}
+	}
+
+	return info, nil
+}
+
+func FormatBlame(info *BlameInfo) string {
+	if info == nil {
+		return ""
+	}
+	return fmt.Sprintf("Blame: %s <%s> commit %s: \"%s\"",
+		info.Author, info.Email, info.Commit, info.Summary)
+}

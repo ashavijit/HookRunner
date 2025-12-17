@@ -1,0 +1,66 @@
+name: 'HookRunner'
+description: 'Run pre-commit hooks with HookRunner - fast, cross-platform hook manager'
+author: 'ashavijit'
+branding:
+  icon: 'git-commit'
+  color: 'purple'
+
+inputs:
+  hook-type:
+    description: 'Type of hook to run (pre-commit, pre-push, etc.)'
+    required: false
+    default: 'pre-commit'
+  all-files:
+    description: 'Run on all files instead of staged files'
+    required: false
+    default: 'false'
+  fix:
+    description: 'Run hooks in fix mode'
+    required: false
+    default: 'false'
+  config:
+    description: 'Path to config file'
+    required: false
+    default: ''
+  version:
+    description: 'HookRunner version to use'
+    required: false
+    default: 'latest'
+
+outputs:
+  passed:
+    description: 'Whether all hooks passed'
+  failed-hooks:
+    description: 'List of failed hook names'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install HookRunner
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest
+        else
+          go install github.com/ashavijit/hookrunner/cmd/hookrunner@${{ inputs.version }}
+        fi
+
+    - name: Run HookRunner
+      shell: bash
+      run: |
+        ARGS="${{ inputs.hook-type }}"
+
+        if [ "${{ inputs.all-files }}" = "true" ]; then
+          ARGS="$ARGS --all-files"
+        fi
+
+        if [ "${{ inputs.fix }}" = "true" ]; then
+          ARGS="$ARGS --fix"
+        fi
+
+        hookrunner run $ARGS

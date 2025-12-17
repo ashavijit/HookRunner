@@ -1,0 +1,36 @@
+# Example: Using HookRunner GitHub Action
+name: HookRunner
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  hooks:
+    name: Run Hooks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Pre-commit Hooks
+        uses: ashavijit/HookRunner@v1
+        with:
+          hook-type: pre-commit
+          all-files: true
+
+  lint:
+    name: Lint Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ashavijit/HookRunner@v1
+        with:
+          hook-type: pre-commit
+          all-files: true
+          fix: false

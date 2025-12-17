@@ -1,16 +1,16 @@
 $ErrorActionPreference = "Stop"
 
-$Repo = "ashavijit/hookrunner"
+$Repo = "ashavijit/HookRunner"
 $InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { "$env:LOCALAPPDATA\hookrunner" }
 $Version = if ($env:VERSION) { $env:VERSION } else { "latest" }
 $Arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
 
 if ($Version -eq "latest") {
     try {
-        $VersionUrl = "https://raw.githubusercontent.com/$Repo/master/VERSION"
-        $Version = (Invoke-WebRequest -Uri $VersionUrl -UseBasicParsing).Content.Trim()
+        $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{"User-Agent"="HookRunner-Installer"}
+        $Version = $Release.tag_name
     } catch {
-        $Version = "v0.1.1"
+        $Version = "v0.19.0"
     }
 }
 
@@ -33,8 +33,8 @@ Write-Host "Downloading..." -ForegroundColor Yellow
 try {
     Invoke-WebRequest -Uri $Url -OutFile $DestPath -UseBasicParsing
 } catch {
-    Write-Error "Failed to download from: $Url"
-    Write-Host "Try: go install github.com/$Repo/cmd/hookrunner@latest" -ForegroundColor Yellow
+    Write-Error "Download failed: $Url"
+    Write-Host "Try: go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest" -ForegroundColor Yellow
     exit 1
 }
 

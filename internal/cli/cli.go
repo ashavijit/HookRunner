@@ -12,6 +12,7 @@ import (
 	"github.com/ashavijit/hookrunner/internal/config"
 	"github.com/ashavijit/hookrunner/internal/executor"
 	"github.com/ashavijit/hookrunner/internal/git"
+	"github.com/ashavijit/hookrunner/internal/policy"
 	"github.com/ashavijit/hookrunner/internal/presets"
 	"github.com/ashavijit/hookrunner/internal/tool"
 	"github.com/ashavijit/hookrunner/internal/version"
@@ -85,6 +86,29 @@ var presetsCmd = &cobra.Command{
 	Run:   runPresets,
 }
 
+var policyCmd = &cobra.Command{
+	Use:   "policy",
+	Short: "Manage policies",
+}
+
+var policyListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List configured policies",
+	RunE:  runPolicyList,
+}
+
+var policyFetchCmd = &cobra.Command{
+	Use:   "fetch",
+	Short: "Force refresh remote policies",
+	RunE:  runPolicyFetch,
+}
+
+var policyClearCmd = &cobra.Command{
+	Use:   "clear-cache",
+	Short: "Clear policy cache",
+	RunE:  runPolicyClearCache,
+}
+
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version information",
@@ -102,7 +126,8 @@ func init() {
 
 	initCmd.Flags().StringVar(&language, "lang", "", "Language preset (go, nodejs, python, java, ruby, rust)")
 
-	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, presetsCmd, versionCmd)
+	policyCmd.AddCommand(policyListCmd, policyFetchCmd, policyClearCmd)
+	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, presetsCmd, policyCmd, versionCmd)
 }
 
 func Execute() error {
@@ -388,4 +413,160 @@ func runPresets(cmd *cobra.Command, args []string) {
 
 	fmt.Println()
 	fmt.Println("Usage: hookrunner init --lang <language>")
+}
+
+func runPolicyList(cmd *cobra.Command, args []string) error {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	cfg, _, err := config.Load(workDir)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Policy Configuration:")
+	fmt.Println("=====================")
+	fmt.Println()
+
+	if cfg.Policies == nil {
+		fmt.Println("No policies configured")
+		return nil
+	}
+
+	p := cfg.Policies
+	fmt.Printf("Type: %s\n", p.Type)
+
+	if cfg.HasRemotePolicies() {
+		fmt.Println("\nRemote Policies:")
+		for _, ref := range p.Policies {
+			fmt.Printf("  - %s\n", ref.URL)
+		}
+	}
+
+	if len(p.LocalPolicies) > 0 {
+		fmt.Println("\nLocal Policies:")
+		for _, lp := range p.LocalPolicies {
+			fmt.Printf("  - %s\n", lp.Name)
+		}
+	}
+
+	if cfg.HasRemotePolicies() {
+		cacheDir := filepath.Join(workDir, ".hooks", "cache")
+		registry := policy.NewRegistry(workDir, cacheDir)
+
+		userCfg := buildUserConfig(p)
+
+		merged, err := registry.Load(userCfg)
+		if err != nil {
+			fmt.Printf("\n⚠ Failed to load policies: %v\n", err)
+		} else if merged != nil {
+			fmt.Println("\nLoaded Remote Policies:")
+			for _, rp := range merged.RemotePolicies {
+				fmt.Printf("  ✓ %s\n", rp.Identifier())
+			}
+		}
+	}
+
+	return nil
+}
+
+func runPolicyFetch(cmd *cobra.Command, args []string) error {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	cfg, _, err := config.Load(workDir)
+	if err != nil {
+		return err
+	}
+
+	if !cfg.HasRemotePolicies() {
+		fmt.Println("No remote policies configured")
+		return nil
+	}
+
+	cacheDir := filepath.Join(workDir, ".hooks", "cache")
+	registry := policy.NewRegistry(workDir, cacheDir)
+
+	p := cfg.Policies
+	userCfg := buildUserConfig(p)
+
+	if err := registry.Refresh(userCfg); err != nil {
+		return fmt.Errorf("failed to refresh: %w", err)
+	}
+
+	fmt.Println("Policies refreshed successfully")
+	return nil
+}
+
+func runPolicyClearCache(cmd *cobra.Command, args []string) error {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	cacheDir := filepath.Join(workDir, ".hooks", "cache")
+	registry := policy.NewRegistry(workDir, cacheDir)
+
+	if err := registry.ClearCache(); err != nil {
+		return fmt.Errorf("failed to clear cache: %w", err)
+	}
+
+	fmt.Println("Policy cache cleared")
+	return nil
+}
+
+func buildUserConfig(p *config.Policies) *policy.UserConfig {
+	userCfg := &policy.UserConfig{Type: p.Type}
+
+	for _, ref := range p.Policies {
+		userCfg.Policies = append(userCfg.Policies, policy.PolicyRef{URL: ref.URL})
+	}
+
+	for _, lp := range p.LocalPolicies {
+		userCfg.LocalPolicies = append(userCfg.LocalPolicies, policy.LocalPolicy{
+			Name:        lp.Name,
+			Version:     lp.Version,
+			Description: lp.Description,
+			Metadata:    lp.Metadata,
+			Rules:       convertConfigRules(lp.Rules),
+		})
+	}
+
+	return userCfg
+}
+
+func convertConfigRules(r config.PolicyRules) policy.PolicyRules {
+	var cm *policy.CommitMessageRule
+	if r.CommitMessage != nil {
+		cm = &policy.CommitMessageRule{
+			Regex: r.CommitMessage.Regex,
+			Error: r.CommitMessage.Error,
+		}
+	}
+
+	var patterns []policy.ForbiddenContentPattern
+	for _, p := range r.ForbidFileContent {
+		patterns = append(patterns, policy.ForbiddenContentPattern{
+			Pattern:     p.Pattern,
+			Description: p.Description,
+		})
+	}
+
+	return policy.PolicyRules{
+		ForbidFiles:          r.ForbidFiles,
+		ForbidDirectories:    r.ForbidDirectories,
+		ForbidFileExtensions: r.ForbidFileExtensions,
+		RequiredFiles:        r.RequiredFiles,
+		MaxFileSizeKB:        r.MaxFileSizeKB,
+		MaxFilesChanged:      r.MaxFilesChanged,
+		ForbidFileContent:    patterns,
+		CommitMessage:        cm,
+		EnforceHooks:         r.EnforceHooks,
+		HookTimeBudgetMs:     r.HookTimeBudgetMs,
+		MaxParallelHooks:     r.MaxParallelHooks,
+	}
 }

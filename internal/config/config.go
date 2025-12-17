@@ -32,18 +32,46 @@ type Hook struct {
 	FailFast bool              `yaml:"fail_fast" json:"fail_fast"`
 }
 
-type CommitMessagePolicy struct {
-	Regex     string `yaml:"regex" json:"regex"`
-	MaxLength int    `yaml:"max_length" json:"max_length"`
-	MinLength int    `yaml:"min_length" json:"min_length"`
+type PolicyRef struct {
+	URL string `yaml:"url" json:"url"`
+}
+
+type ForbiddenContentPattern struct {
+	Pattern     string `yaml:"pattern" json:"pattern"`
+	Description string `yaml:"description" json:"description"`
+}
+
+type CommitMessageRule struct {
+	Regex string `yaml:"regex" json:"regex"`
+	Error string `yaml:"error" json:"error"`
+}
+
+type PolicyRules struct {
+	ForbidFiles          []string                  `yaml:"forbid_files" json:"forbid_files"`
+	ForbidDirectories    []string                  `yaml:"forbid_directories" json:"forbid_directories"`
+	ForbidFileExtensions []string                  `yaml:"forbid_file_extensions" json:"forbid_file_extensions"`
+	RequiredFiles        []string                  `yaml:"required_files" json:"required_files"`
+	MaxFileSizeKB        int                       `yaml:"max_file_size_kb" json:"max_file_size_kb"`
+	MaxFilesChanged      int                       `yaml:"max_files_changed" json:"max_files_changed"`
+	ForbidFileContent    []ForbiddenContentPattern `yaml:"forbid_file_content" json:"forbid_file_content"`
+	CommitMessage        *CommitMessageRule        `yaml:"commit_message" json:"commit_message"`
+	EnforceHooks         []string                  `yaml:"enforce_hooks" json:"enforce_hooks"`
+	HookTimeBudgetMs     map[string]int            `yaml:"hook_time_budget_ms" json:"hook_time_budget_ms"`
+	MaxParallelHooks     int                       `yaml:"max_parallel_hooks" json:"max_parallel_hooks"`
+}
+
+type LocalPolicy struct {
+	Name        string            `yaml:"name" json:"name"`
+	Version     string            `yaml:"version" json:"version"`
+	Description string            `yaml:"description" json:"description"`
+	Rules       PolicyRules       `yaml:"rules" json:"rules"`
+	Metadata    map[string]string `yaml:"metadata" json:"metadata"`
 }
 
 type Policies struct {
-	MaxFilesChanged   int                 `yaml:"max_files_changed" json:"max_files_changed"`
-	ForbidDirectories []string            `yaml:"forbid_directories" json:"forbid_directories"`
-	ForbidFiles       []string            `yaml:"forbid_files" json:"forbid_files"`
-	RequireFiles      []string            `yaml:"require_files" json:"require_files"`
-	CommitMessage     CommitMessagePolicy `yaml:"commit_message" json:"commit_message"`
+	Type          string        `yaml:"type" json:"type"`
+	Policies      []PolicyRef   `yaml:"policies" json:"policies"`
+	LocalPolicies []LocalPolicy `yaml:"localPolicies" json:"localPolicies"`
 }
 
 type Config struct {
@@ -105,6 +133,24 @@ func (c *Config) GetTool(name string) *Tool {
 	return nil
 }
 
+func (c *Config) HasRemotePolicies() bool {
+	if c.Policies == nil {
+		return false
+	}
+	return c.Policies.Type == "raw" && len(c.Policies.Policies) > 0
+}
+
+func (c *Config) GetPolicyURLs() []string {
+	if c.Policies == nil {
+		return nil
+	}
+	urls := make([]string, len(c.Policies.Policies))
+	for i, ref := range c.Policies.Policies {
+		urls[i] = ref.URL
+	}
+	return urls
+}
+
 func DefaultConfig() string {
 	return `tools:
   golangci-lint:
@@ -115,11 +161,14 @@ func DefaultConfig() string {
       darwin: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-darwin-amd64.tar.gz
 
 policies:
-  max_files_changed: 50
-  forbid_directories: ["vendor/", "generated/"]
-  commit_message:
-    regex: "^(feat|fix|chore|docs|refactor|test):"
-    min_length: 10
+  type: raw
+  policies:
+    - url: https://policies.example.dev/default.yaml
+  localPolicies:
+    commit-style:
+      commit_message:
+        regex: "^(feat|fix|chore|docs|refactor|test):"
+        min_length: 10
 
 hooks:
   pre-commit:

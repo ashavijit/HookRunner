@@ -81,11 +81,15 @@ func TestLoad_WithPolicies(t *testing.T) {
 	dir := t.TempDir()
 	content := `
 policies:
-  max_files_changed: 10
-  forbid_directories: ["vendor/"]
-  commit_message:
-    regex: "^feat:"
-    min_length: 5
+  type: raw
+  policies:
+    - url: https://example.com/policy.yaml
+  localPolicies:
+    - name: commit-style
+      version: local
+      rules:
+        commit_message:
+          regex: "^feat:"
 
 hooks:
   pre-commit:
@@ -106,16 +110,25 @@ hooks:
 		t.Fatal("policies is nil")
 	}
 
-	if cfg.Policies.MaxFilesChanged != 10 {
-		t.Errorf("expected max_files_changed 10, got %d", cfg.Policies.MaxFilesChanged)
+	if cfg.Policies.Type != "raw" {
+		t.Errorf("expected type raw, got %s", cfg.Policies.Type)
 	}
 
-	if len(cfg.Policies.ForbidDirectories) != 1 {
-		t.Error("expected 1 forbidden directory")
+	if len(cfg.Policies.Policies) != 1 {
+		t.Errorf("expected 1 policy URL, got %d", len(cfg.Policies.Policies))
 	}
 
-	if cfg.Policies.CommitMessage.Regex != "^feat:" {
-		t.Error("expected commit message regex")
+	if len(cfg.Policies.LocalPolicies) != 1 {
+		t.Error("expected 1 local policy")
+	}
+
+	if !cfg.HasRemotePolicies() {
+		t.Error("expected HasRemotePolicies to return true")
+	}
+
+	urls := cfg.GetPolicyURLs()
+	if len(urls) != 1 || urls[0] != "https://example.com/policy.yaml" {
+		t.Errorf("unexpected URLs: %v", urls)
 	}
 }
 

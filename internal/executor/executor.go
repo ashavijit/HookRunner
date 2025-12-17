@@ -95,25 +95,79 @@ func (e *Executor) Run(hookType string, files []string, allFiles bool) []Result 
 	return results
 }
 
-func (e *Executor) CheckPolicies(files []string, commitMsg string) *policy.PolicyResult {
+func (e *Executor) CheckPolicies(files []string, commitMsg string) *policy.EvalResult {
 	if e.config.Policies == nil {
 		return nil
 	}
 
-	policies := &policy.Policies{
-		MaxFilesChanged:   e.config.Policies.MaxFilesChanged,
-		ForbidDirectories: e.config.Policies.ForbidDirectories,
-		ForbidFiles:       e.config.Policies.ForbidFiles,
-		RequireFiles:      e.config.Policies.RequireFiles,
-		CommitMessage: policy.CommitMessagePolicy{
-			Regex:     e.config.Policies.CommitMessage.Regex,
-			MaxLength: e.config.Policies.CommitMessage.MaxLength,
-			MinLength: e.config.Policies.CommitMessage.MinLength,
-		},
+	cacheDir := filepath.Join(e.workDir, ".hooks", "cache")
+	registry := policy.NewRegistry(e.workDir, cacheDir)
+
+	p := e.config.Policies
+	userCfg := &policy.UserConfig{
+		Type: p.Type,
 	}
 
-	result := policy.Evaluate(policies, files, commitMsg)
+	for _, ref := range p.Policies {
+		userCfg.Policies = append(userCfg.Policies, policy.PolicyRef{URL: ref.URL})
+	}
+
+	for _, lp := range p.LocalPolicies {
+		userCfg.LocalPolicies = append(userCfg.LocalPolicies, policy.LocalPolicy{
+			Name:        lp.Name,
+			Version:     lp.Version,
+			Description: lp.Description,
+			Metadata:    lp.Metadata,
+			Rules:       convertRules(lp.Rules),
+		})
+	}
+
+	merged, err := registry.Load(userCfg)
+	if err != nil {
+		return &policy.EvalResult{
+			Passed:     false,
+			Violations: []policy.Violation{{Rule: "load", Message: err.Error()}},
+		}
+	}
+
+	if merged == nil {
+		return nil
+	}
+
+	result := policy.Evaluate(&merged.EffectiveRules, files, commitMsg)
 	return &result
+}
+
+func convertRules(r config.PolicyRules) policy.PolicyRules {
+	var cm *policy.CommitMessageRule
+	if r.CommitMessage != nil {
+		cm = &policy.CommitMessageRule{
+			Regex: r.CommitMessage.Regex,
+			Error: r.CommitMessage.Error,
+		}
+	}
+
+	var patterns []policy.ForbiddenContentPattern
+	for _, p := range r.ForbidFileContent {
+		patterns = append(patterns, policy.ForbiddenContentPattern{
+			Pattern:     p.Pattern,
+			Description: p.Description,
+		})
+	}
+
+	return policy.PolicyRules{
+		ForbidFiles:          r.ForbidFiles,
+		ForbidDirectories:    r.ForbidDirectories,
+		ForbidFileExtensions: r.ForbidFileExtensions,
+		RequiredFiles:        r.RequiredFiles,
+		MaxFileSizeKB:        r.MaxFileSizeKB,
+		MaxFilesChanged:      r.MaxFilesChanged,
+		ForbidFileContent:    patterns,
+		CommitMessage:        cm,
+		EnforceHooks:         r.EnforceHooks,
+		HookTimeBudgetMs:     r.HookTimeBudgetMs,
+		MaxParallelHooks:     r.MaxParallelHooks,
+	}
 }
 
 func (e *Executor) runBatch(hooks []config.Hook, files []string, allFiles bool) []Result {
@@ -300,7 +354,7 @@ func PrintResults(results []Result, verbose bool, quiet bool) {
 	}
 }
 
-func PrintPolicyResult(result *policy.PolicyResult, quiet bool) {
+func PrintPolicyResult(result *policy.EvalResult, quiet bool) {
 	if quiet || result == nil {
 		return
 	}
@@ -313,7 +367,7 @@ func PrintPolicyResult(result *policy.PolicyResult, quiet bool) {
 	} else {
 		fmt.Printf("%s policies\n", red("[FAIL]"))
 		for _, v := range result.Violations {
-			fmt.Printf("  - [%s] %s\n", v.Rule, v.Message)
+			fmt.Printf("  ✗ [%s] %s\n", v.Rule, v.Message)
 		}
 	}
 }

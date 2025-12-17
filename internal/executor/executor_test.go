@@ -71,11 +71,20 @@ func TestCheckPolicies_NilPolicies(t *testing.T) {
 func TestCheckPolicies_WithPolicies(t *testing.T) {
 	cfg := &config.Config{
 		Policies: &config.Policies{
-			MaxFilesChanged: 2,
+			Type: "raw",
+			LocalPolicies: []config.LocalPolicy{
+				{
+					Name:    "max-files",
+					Version: "local",
+					Rules: config.PolicyRules{
+						MaxFilesChanged: 2,
+					},
+				},
+			},
 		},
 	}
 	toolMgr := tool.NewManager("/tmp/cache")
-	exec := New(cfg, toolMgr, "/tmp/work")
+	exec := New(cfg, toolMgr, t.TempDir())
 
 	files := []string{"a.go", "b.go", "c.go"}
 	result := exec.CheckPolicies(files, "msg")

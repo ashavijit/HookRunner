@@ -4,181 +4,155 @@ import (
 	"testing"
 )
 
-func TestEvaluate_MaxFilesChanged(t *testing.T) {
-	policies := &Policies{
-		MaxFilesChanged: 3,
+func TestPolicyRules_Merge(t *testing.T) {
+	base := PolicyRules{
+		MaxFilesChanged:   10,
+		ForbidDirectories: []string{"vendor/"},
+	}
+	overlay := PolicyRules{
+		MaxFilesChanged:   20,
+		ForbidDirectories: []string{"generated/"},
 	}
 
-	files := []string{"a.go", "b.go", "c.go", "d.go"}
-	result := Evaluate(policies, files, "")
+	result := base.Merge(overlay)
 
-	if result.Passed {
-		t.Error("expected policy to fail for too many files")
+	if result.MaxFilesChanged != 20 {
+		t.Errorf("expected 20, got %d", result.MaxFilesChanged)
 	}
-
-	if len(result.Violations) != 1 {
-		t.Errorf("expected 1 violation, got %d", len(result.Violations))
-	}
-
-	if result.Violations[0].Rule != "max_files_changed" {
-		t.Errorf("expected rule max_files_changed, got %s", result.Violations[0].Rule)
+	if len(result.ForbidDirectories) != 2 {
+		t.Errorf("expected 2 dirs, got %d", len(result.ForbidDirectories))
 	}
 }
 
-func TestEvaluate_MaxFilesChanged_Pass(t *testing.T) {
-	policies := &Policies{
-		MaxFilesChanged: 5,
+func TestPolicyRules_MergeCommitMessage(t *testing.T) {
+	base := PolicyRules{
+		CommitMessage: &CommitMessageRule{
+			Regex: "^feat:",
+		},
+	}
+	overlay := PolicyRules{
+		CommitMessage: &CommitMessageRule{
+			Error: "commit must start with feat:",
+		},
 	}
 
-	files := []string{"a.go", "b.go"}
-	result := Evaluate(policies, files, "")
+	result := base.Merge(overlay)
 
-	if !result.Passed {
-		t.Error("expected policy to pass")
+	if result.CommitMessage == nil {
+		t.Fatal("commit message should not be nil")
+	}
+	if result.CommitMessage.Regex != "^feat:" {
+		t.Error("regex should be preserved")
+	}
+	if result.CommitMessage.Error != "commit must start with feat:" {
+		t.Error("error should be set from overlay")
+	}
+}
+
+func TestPolicyRules_MergeNoDuplicates(t *testing.T) {
+	base := PolicyRules{
+		ForbidFiles: []string{"\\.env$"},
+	}
+	overlay := PolicyRules{
+		ForbidFiles: []string{"\\.env$", "\\.secret$"},
+	}
+
+	result := base.Merge(overlay)
+
+	if len(result.ForbidFiles) != 2 {
+		t.Errorf("expected 2 unique files, got %d: %v", len(result.ForbidFiles), result.ForbidFiles)
+	}
+}
+
+func TestRemotePolicy_Identifier(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy RemotePolicy
+		want   string
+	}{
+		{"with version", RemotePolicy{Name: "security", Version: "1.0"}, "security@1.0"},
+		{"no version", RemotePolicy{Name: "basic"}, "basic"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.policy.Identifier(); got != tt.want {
+				t.Errorf("got %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEvaluate_MaxFilesChanged(t *testing.T) {
+	rules := &PolicyRules{MaxFilesChanged: 3}
+	files := []string{"a.go", "b.go", "c.go", "d.go"}
+
+	result := Evaluate(rules, files, "")
+
+	if result.Passed {
+		t.Error("expected failure for too many files")
+	}
+	if len(result.Violations) != 1 {
+		t.Errorf("expected 1 violation, got %d", len(result.Violations))
 	}
 }
 
 func TestEvaluate_ForbidDirectories(t *testing.T) {
-	policies := &Policies{
-		ForbidDirectories: []string{"vendor/"},
-	}
-
+	rules := &PolicyRules{ForbidDirectories: []string{"vendor/"}}
 	files := []string{"main.go", "vendor/lib.go"}
-	result := Evaluate(policies, files, "")
+
+	result := Evaluate(rules, files, "")
 
 	if result.Passed {
-		t.Error("expected policy to fail for forbidden directory")
-	}
-
-	if result.Violations[0].Rule != "forbid_directories" {
-		t.Errorf("expected rule forbid_directories, got %s", result.Violations[0].Rule)
-	}
-}
-
-func TestEvaluate_ForbidDirectories_Pass(t *testing.T) {
-	policies := &Policies{
-		ForbidDirectories: []string{"vendor/"},
-	}
-
-	files := []string{"main.go", "lib/util.go"}
-	result := Evaluate(policies, files, "")
-
-	if !result.Passed {
-		t.Error("expected policy to pass")
+		t.Error("expected failure for forbidden directory")
 	}
 }
 
 func TestEvaluate_CommitMessageRegex(t *testing.T) {
-	policies := &Policies{
-		CommitMessage: CommitMessagePolicy{
-			Regex: "^(feat|fix|chore):",
-		},
+	rules := &PolicyRules{
+		CommitMessage: &CommitMessageRule{Regex: "^(feat|fix):"},
 	}
 
-	result := Evaluate(policies, nil, "invalid commit message")
-
+	result := Evaluate(rules, nil, "invalid message")
 	if result.Passed {
-		t.Error("expected policy to fail for invalid commit message")
+		t.Error("expected failure for invalid commit message")
 	}
 
-	if result.Violations[0].Rule != "commit_message.regex" {
-		t.Errorf("expected rule commit_message.regex, got %s", result.Violations[0].Rule)
-	}
-}
-
-func TestEvaluate_CommitMessageRegex_Pass(t *testing.T) {
-	policies := &Policies{
-		CommitMessage: CommitMessagePolicy{
-			Regex: "^(feat|fix|chore):",
-		},
-	}
-
-	result := Evaluate(policies, nil, "feat: add new feature")
-
+	result = Evaluate(rules, nil, "feat: add feature")
 	if !result.Passed {
-		t.Error("expected policy to pass")
+		t.Error("expected pass for valid commit message")
 	}
 }
 
-func TestEvaluate_CommitMessageMinLength(t *testing.T) {
-	policies := &Policies{
-		CommitMessage: CommitMessagePolicy{
-			MinLength: 20,
-		},
-	}
-
-	result := Evaluate(policies, nil, "short msg")
-
-	if result.Passed {
-		t.Error("expected policy to fail for short message")
-	}
-
-	if result.Violations[0].Rule != "commit_message.min_length" {
-		t.Errorf("expected rule commit_message.min_length, got %s", result.Violations[0].Rule)
-	}
-}
-
-func TestEvaluate_CommitMessageMaxLength(t *testing.T) {
-	policies := &Policies{
-		CommitMessage: CommitMessagePolicy{
-			MaxLength: 10,
-		},
-	}
-
-	result := Evaluate(policies, nil, "this is a very long commit message")
-
-	if result.Passed {
-		t.Error("expected policy to fail for long message")
-	}
-
-	if result.Violations[0].Rule != "commit_message.max_length" {
-		t.Errorf("expected rule commit_message.max_length, got %s", result.Violations[0].Rule)
-	}
-}
-
-func TestEvaluate_NilPolicies(t *testing.T) {
+func TestEvaluate_NilRules(t *testing.T) {
 	result := Evaluate(nil, []string{"a.go"}, "msg")
-
 	if !result.Passed {
-		t.Error("expected nil policies to pass")
+		t.Error("nil rules should pass")
 	}
 }
 
-func TestEvaluate_MultiplePolicies(t *testing.T) {
-	policies := &Policies{
-		MaxFilesChanged:   2,
-		ForbidDirectories: []string{"vendor/"},
-		CommitMessage: CommitMessagePolicy{
-			Regex: "^feat:",
-		},
+func TestValidatePolicy(t *testing.T) {
+	valid := &RemotePolicy{Name: "test"}
+	if err := ValidatePolicy(valid); err != nil {
+		t.Errorf("valid policy should pass: %v", err)
 	}
 
-	files := []string{"a.go", "b.go", "c.go", "vendor/d.go"}
-	result := Evaluate(policies, files, "bad message")
-
-	if result.Passed {
-		t.Error("expected policy to fail")
-	}
-
-	if len(result.Violations) != 3 {
-		t.Errorf("expected 3 violations, got %d", len(result.Violations))
+	invalid := &RemotePolicy{}
+	if err := ValidatePolicy(invalid); err == nil {
+		t.Error("invalid policy should fail")
 	}
 }
 
-func TestPolicyResult_String(t *testing.T) {
-	result := PolicyResult{Passed: true}
-	if result.String() != "All policies passed" {
-		t.Error("expected 'All policies passed'")
+func TestParseRemotePolicy(t *testing.T) {
+	yaml := []byte("name: test\nversion: \"1.0\"\nrules:\n  max_files_changed: 10\n")
+	policy, err := ParseRemotePolicy(yaml)
+	if err != nil {
+		t.Fatalf("ParseRemotePolicy failed: %v", err)
 	}
-
-	result = PolicyResult{
-		Passed: false,
-		Violations: []Violation{
-			{Rule: "test", Message: "test message"},
-		},
+	if policy.Name != "test" {
+		t.Errorf("got name %s, want test", policy.Name)
 	}
-	str := result.String()
-	if str == "" {
-		t.Error("expected non-empty string for violations")
+	if policy.Rules.MaxFilesChanged != 10 {
+		t.Errorf("got max_files_changed %d, want 10", policy.Rules.MaxFilesChanged)
 	}
 }

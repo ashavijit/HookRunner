@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.hookrunner.dev/policy.schema.json",
+  "title": "HookRunner Policy Schema",
+  "type": "object",
+  "required": ["name", "version", "rules"],
+  "additionalProperties": false,
+
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique policy name"
+    },
+
+    "version": {
+      "type": "string",
+      "pattern": "^(local|\\d+\\.\\d+\\.\\d+)$",
+      "description": "Semver or 'local'"
+    },
+
+    "description": {
+      "type": "string"
+    },
+
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "forbid_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+
+        "forbid_directories": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+
+        "forbid_file_extensions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+
+        "required_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+
+        "max_file_size_kb": {
+          "type": "integer",
+          "minimum": 1
+        },
+
+        "max_files_changed": {
+          "type": "integer",
+          "minimum": 1
+        },
+
+        "forbid_file_content": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pattern"],
+            "additionalProperties": false,
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "description": "Regex pattern"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+
+        "commit_message": {
+          "type": "object",
+          "required": ["regex"],
+          "additionalProperties": false,
+          "properties": {
+            "regex": { "type": "string" },
+            "error": { "type": "string" }
+          }
+        },
+
+        "enforce_hooks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+
+        "hook_time_budget_ms": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+
+        "max_parallel_hooks": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Free-form metadata (team, owner, tags)"
+    }
+  }
+}

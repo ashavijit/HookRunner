@@ -56,7 +56,8 @@ func (f *Fetcher) LoadPolicy(url string) (*RemotePolicy, error) {
 		return nil, fmt.Errorf("invalid policy: %w", err)
 	}
 
-	_ = f.cache.SaveToDisk(url, policy, data, etag) // Best-effort cache
+	//nolint:errcheck // Best-effort cache, failure is acceptable
+	f.cache.SaveToDisk(url, policy, data, etag)
 	f.cache.SetInMemory(url, policy)
 
 	return policy, nil

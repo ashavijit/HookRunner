@@ -16,20 +16,28 @@ type Tool struct {
 }
 
 type Hook struct {
-	Name     string            `yaml:"name" json:"name"`
-	Tool     string            `yaml:"tool" json:"tool"`
-	Args     []string          `yaml:"args" json:"args"`
-	FixArgs  []string          `yaml:"fix_args" json:"fix_args"`
-	Files    string            `yaml:"files" json:"files"`
-	Glob     string            `yaml:"glob" json:"glob"`
-	Exclude  string            `yaml:"exclude" json:"exclude"`
-	Timeout  string            `yaml:"timeout" json:"timeout"`
-	After    string            `yaml:"after" json:"after"`
-	Skip     string            `yaml:"skip" json:"skip"`
-	Only     string            `yaml:"only" json:"only"`
-	Env      map[string]string `yaml:"env" json:"env"`
-	PassEnv  []string          `yaml:"pass_env" json:"pass_env"`
-	FailFast bool              `yaml:"fail_fast" json:"fail_fast"`
+	Name        string            `yaml:"name" json:"name"`
+	Tool        string            `yaml:"tool" json:"tool"`
+	Run         string            `yaml:"run" json:"run"`
+	Script      string            `yaml:"script" json:"script"`
+	Runner      string            `yaml:"runner" json:"runner"`
+	Args        []string          `yaml:"args" json:"args"`
+	FixArgs     []string          `yaml:"fix_args" json:"fix_args"`
+	Files       string            `yaml:"files" json:"files"`
+	Glob        string            `yaml:"glob" json:"glob"`
+	Exclude     string            `yaml:"exclude" json:"exclude"`
+	Root        string            `yaml:"root" json:"root"`
+	Timeout     string            `yaml:"timeout" json:"timeout"`
+	After       string            `yaml:"after" json:"after"`
+	Skip        string            `yaml:"skip" json:"skip"`
+	Only        string            `yaml:"only" json:"only"`
+	Tags        []string          `yaml:"tags" json:"tags"`
+	Env         map[string]string `yaml:"env" json:"env"`
+	PassEnv     []string          `yaml:"pass_env" json:"pass_env"`
+	FailFast    bool              `yaml:"fail_fast" json:"fail_fast"`
+	Interactive bool              `yaml:"interactive" json:"interactive"`
+	StageFixed  bool              `yaml:"stage_fixed" json:"stage_fixed"`
+	Piped       bool              `yaml:"piped" json:"piped"`
 }
 
 type PolicyRef struct {
@@ -75,9 +83,12 @@ type Policies struct {
 }
 
 type Config struct {
-	Tools    map[string]Tool   `yaml:"tools" json:"tools"`
-	Hooks    map[string][]Hook `yaml:"hooks" json:"hooks"`
-	Policies *Policies         `yaml:"policies" json:"policies"`
+	Tools       map[string]Tool   `yaml:"tools" json:"tools"`
+	Hooks       map[string][]Hook `yaml:"hooks" json:"hooks"`
+	Policies    *Policies         `yaml:"policies" json:"policies"`
+	ExcludeTags []string          `yaml:"exclude_tags" json:"exclude_tags"`
+	Parallel    bool              `yaml:"parallel" json:"parallel"`
+	ScriptsDir  string            `yaml:"scripts_dir" json:"scripts_dir"`
 }
 
 func Load(dir string) (*Config, string, error) {
@@ -86,10 +97,60 @@ func Load(dir string) (*Config, string, error) {
 		path := filepath.Join(dir, name)
 		if _, err := os.Stat(path); err == nil {
 			cfg, err := loadFile(path)
-			return cfg, path, err
+			if err != nil {
+				return nil, path, err
+			}
+			cfg = mergeLocalConfig(cfg, dir)
+			return cfg, path, nil
 		}
 	}
 	return nil, "", fmt.Errorf("no config file found (hooks.yaml, hooks.yml, or hooks.json)")
+}
+
+func mergeLocalConfig(cfg *Config, dir string) *Config {
+	localFiles := []string{"hooks-local.yaml", "hooks-local.yml", "hooks-local.json"}
+	for _, name := range localFiles {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			local, err := loadFile(path)
+			if err == nil {
+				cfg = mergeConfigs(cfg, local)
+			}
+			break
+		}
+	}
+	return cfg
+}
+
+func mergeConfigs(base, override *Config) *Config {
+	if override.ExcludeTags != nil {
+		base.ExcludeTags = append(base.ExcludeTags, override.ExcludeTags...)
+	}
+	if override.Parallel {
+		base.Parallel = true
+	}
+	if override.ScriptsDir != "" {
+		base.ScriptsDir = override.ScriptsDir
+	}
+	for hookType, hooks := range override.Hooks {
+		if base.Hooks == nil {
+			base.Hooks = make(map[string][]Hook)
+		}
+		for _, oh := range hooks {
+			found := false
+			for i, bh := range base.Hooks[hookType] {
+				if bh.Name == oh.Name {
+					base.Hooks[hookType][i] = oh
+					found = true
+					break
+				}
+			}
+			if !found {
+				base.Hooks[hookType] = append(base.Hooks[hookType], oh)
+			}
+		}
+	}
+	return base
 }
 
 func loadFile(path string) (*Config, error) {

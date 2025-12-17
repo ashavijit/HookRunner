@@ -287,6 +287,14 @@ func (e *Executor) shouldSkip(hook config.Hook) (bool, string) {
 		}
 	}
 
+	for _, excludeTag := range e.config.ExcludeTags {
+		for _, hookTag := range hook.Tags {
+			if excludeTag == hookTag {
+				return true, fmt.Sprintf("excluded tag: %s", excludeTag)
+			}
+		}
+	}
+
 	return false, ""
 }
 
@@ -313,13 +321,6 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 		}
 	}
 
-	toolPath, err := e.toolMgr.EnsureTool(hook.Tool, e.config.GetTool(hook.Tool))
-	if err != nil {
-		result.Error = err
-		result.Duration = time.Since(start)
-		return result
-	}
-
 	timeout := 5 * time.Minute
 	if hook.Timeout != "" {
 		if parsed, parseErr := time.ParseDuration(hook.Timeout); parseErr == nil {
@@ -330,13 +331,54 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	args := hook.Args
-	if e.opts.Fix && len(hook.FixArgs) > 0 {
-		args = hook.FixArgs
+	var cmd *exec.Cmd
+	workDir := e.workDir
+	if hook.Root != "" {
+		workDir = filepath.Join(e.workDir, hook.Root)
 	}
 
-	cmd := exec.CommandContext(ctx, toolPath, args...)
-	cmd.Dir = e.workDir
+	if hook.Run != "" {
+		shell := "sh"
+		shellArgs := []string{"-c", hook.Run}
+		if strings.Contains(os.Getenv("OS"), "Windows") {
+			shell = "cmd"
+			shellArgs = []string{"/c", hook.Run}
+		}
+		cmd = exec.CommandContext(ctx, shell, shellArgs...)
+	} else if hook.Script != "" {
+		scriptsDir := e.config.ScriptsDir
+		if scriptsDir == "" {
+			scriptsDir = ".hooks"
+		}
+		scriptPath := filepath.Join(e.workDir, scriptsDir, hook.Script)
+		runner := hook.Runner
+		if runner == "" {
+			if strings.HasSuffix(hook.Script, ".ps1") {
+				runner = "powershell"
+			} else {
+				runner = "sh"
+			}
+		}
+		cmd = exec.CommandContext(ctx, runner, scriptPath)
+	} else if hook.Tool != "" {
+		toolPath, err := e.toolMgr.EnsureTool(hook.Tool, e.config.GetTool(hook.Tool))
+		if err != nil {
+			result.Error = err
+			result.Duration = time.Since(start)
+			return result
+		}
+		args := hook.Args
+		if e.opts.Fix && len(hook.FixArgs) > 0 {
+			args = hook.FixArgs
+		}
+		cmd = exec.CommandContext(ctx, toolPath, args...)
+	} else {
+		result.Error = fmt.Errorf("hook must have tool, run, or script")
+		result.Duration = time.Since(start)
+		return result
+	}
+
+	cmd.Dir = workDir
 	cmd.Env = e.buildEnv(hook)
 
 	output, err := cmd.CombinedOutput()

@@ -33,7 +33,8 @@ func (f *Fetcher) LoadPolicy(url string) (*RemotePolicy, error) {
 		return policy, nil
 	}
 
-	cached, meta, _ := f.cache.GetFromDisk(url)
+	cached, meta, diskErr := f.cache.GetFromDisk(url)
+	_ = diskErr // Intentionally ignore - fallback to network if cache fails
 	if cached != nil && meta != nil {
 		notModified, err := f.checkNotModified(url, meta.ETag)
 		if err == nil && notModified {
@@ -55,7 +56,7 @@ func (f *Fetcher) LoadPolicy(url string) (*RemotePolicy, error) {
 		return nil, fmt.Errorf("invalid policy: %w", err)
 	}
 
-	f.cache.SaveToDisk(url, policy, data, etag)
+	_ = f.cache.SaveToDisk(url, policy, data, etag) // Best-effort cache
 	f.cache.SetInMemory(url, policy)
 
 	return policy, nil

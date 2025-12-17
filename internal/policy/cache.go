@@ -57,8 +57,8 @@ func (c *Cache) GetFromDisk(url string) (*RemotePolicy, *CacheMetadata, error) {
 	}
 
 	var meta CacheMetadata
-	if err := json.Unmarshal(metaData, &meta); err != nil {
-		return nil, nil, err
+	if jsonErr := json.Unmarshal(metaData, &meta); jsonErr != nil {
+		return nil, nil, jsonErr
 	}
 
 	policyPath := filepath.Join(cacheDir, "policy.yaml")
@@ -94,11 +94,11 @@ func (c *Cache) SaveToDisk(url string, policy *RemotePolicy, policyData []byte, 
 		return err
 	}
 
-	if err := os.WriteFile(filepath.Join(cacheDir, "metadata.json"), metaData, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDir, "metadata.json"), metaData, 0600); err != nil {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(cacheDir, "policy.yaml"), policyData, 0644)
+	return os.WriteFile(filepath.Join(cacheDir, "policy.yaml"), policyData, 0600)
 }
 
 func (c *Cache) Clear() error {

@@ -78,10 +78,13 @@ func TestInstallHook(t *testing.T) {
 		t.Fatalf("failed to install hook: %v", err)
 	}
 
-	root, _ := FindRepoRoot()
+	root, rootErr := FindRepoRoot()
+	if rootErr != nil {
+		t.Fatalf("FindRepoRoot failed: %v", rootErr)
+	}
 	hookPath := filepath.Join(root, ".git", "hooks", "pre-commit")
 
-	if _, err := os.Stat(hookPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(hookPath); os.IsNotExist(statErr) {
 		t.Error("hook file should exist")
 	}
 
@@ -110,10 +113,13 @@ func TestUninstallHook(t *testing.T) {
 		t.Fatalf("failed to uninstall hook: %v", err)
 	}
 
-	root, _ := FindRepoRoot()
+	root, rootErr := FindRepoRoot()
+	if rootErr != nil {
+		t.Fatalf("FindRepoRoot failed: %v", rootErr)
+	}
 	hookPath := filepath.Join(root, ".git", "hooks", "test-hook")
 
-	if _, err := os.Stat(hookPath); !os.IsNotExist(err) {
+	if _, statErr := os.Stat(hookPath); !os.IsNotExist(statErr) {
 		t.Error("hook file should not exist after uninstall")
 	}
 }

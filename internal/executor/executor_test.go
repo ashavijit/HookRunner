@@ -131,7 +131,7 @@ func TestHasFailure_Skipped(t *testing.T) {
 
 func TestParseSkipEnv(t *testing.T) {
 	result := ParseSkipEnv()
-	if result != nil && len(result) > 0 {
+	if len(result) > 0 {
 		t.Logf("SKIP env: %v", result)
 	}
 }

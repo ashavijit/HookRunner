@@ -65,7 +65,8 @@ func TestGetCachedPath(t *testing.T) {
 	}
 
 	expectedDir := filepath.Join("/cache", "tool-1.0.0")
-	if !filepath.HasPrefix(path, expectedDir) {
+	// Use strings.HasPrefix instead of deprecated filepath.HasPrefix
+	if len(path) < len(expectedDir) || path[:len(expectedDir)] != expectedDir {
 		t.Errorf("expected path to start with %s, got %s", expectedDir, path)
 	}
 }

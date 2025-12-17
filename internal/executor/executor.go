@@ -147,7 +147,7 @@ func convertRules(r config.PolicyRules) policy.PolicyRules {
 		}
 	}
 
-	var patterns []policy.ForbiddenContentPattern
+	patterns := make([]policy.ForbiddenContentPattern, 0, len(r.ForbidFileContent))
 	for _, p := range r.ForbidFileContent {
 		patterns = append(patterns, policy.ForbiddenContentPattern{
 			Pattern:     p.Pattern,
@@ -240,7 +240,7 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 
 	timeout := 5 * time.Minute
 	if hook.Timeout != "" {
-		if parsed, err := time.ParseDuration(hook.Timeout); err == nil {
+		if parsed, parseErr := time.ParseDuration(hook.Timeout); parseErr == nil {
 			timeout = parsed
 		}
 	}
@@ -287,7 +287,7 @@ func (e *Executor) buildEnv(hook config.Hook) []string {
 }
 
 func (e *Executor) filterFiles(files []string, hook config.Hook) []string {
-	var matched []string
+	matched := make([]string, 0, len(files))
 
 	for _, f := range files {
 		if hook.Files != "" {
@@ -298,7 +298,8 @@ func (e *Executor) filterFiles(files []string, hook config.Hook) []string {
 		}
 
 		if hook.Glob != "" {
-			if ok, _ := filepath.Match(hook.Glob, filepath.Base(f)); !ok {
+			ok, matchErr := filepath.Match(hook.Glob, filepath.Base(f))
+			if matchErr != nil || !ok {
 				continue
 			}
 		}

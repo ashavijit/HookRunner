@@ -89,9 +89,7 @@ func (r *PolicyRules) Merge(other PolicyRules) PolicyRules {
 	result.RequiredFiles = appendUnique(result.RequiredFiles, other.RequiredFiles)
 	result.EnforceHooks = appendUnique(result.EnforceHooks, other.EnforceHooks)
 
-	for _, pattern := range other.ForbidFileContent {
-		result.ForbidFileContent = append(result.ForbidFileContent, pattern)
-	}
+	result.ForbidFileContent = append(result.ForbidFileContent, other.ForbidFileContent...)
 
 	if other.CommitMessage != nil {
 		if result.CommitMessage == nil {

@@ -257,7 +257,8 @@ func runDirectCmd(cmd *cobra.Command, args []string) error {
 	cacheDir := filepath.Join(workDir, ".hooks", "cache")
 	toolMgr := tool.NewManager(cacheDir)
 
-	cfg, _, _ := config.Load(workDir)
+	cfg, _, loadErr := config.Load(workDir)
+	_ = loadErr // handling one case :: config file not found
 	var toolCfg *config.Tool
 	if cfg != nil {
 		toolCfg = cfg.GetTool(args[0])
@@ -392,7 +393,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		configContent = config.DefaultConfig()
 	}
 
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		return fmt.Errorf("failed to create config: %w", err)
 	}
 
@@ -548,7 +549,7 @@ func convertConfigRules(r config.PolicyRules) policy.PolicyRules {
 		}
 	}
 
-	var patterns []policy.ForbiddenContentPattern
+	patterns := make([]policy.ForbiddenContentPattern, 0, len(r.ForbidFileContent))
 	for _, p := range r.ForbidFileContent {
 		patterns = append(patterns, policy.ForbiddenContentPattern{
 			Pattern:     p.Pattern,

@@ -68,6 +68,7 @@ func InstallHook(hookType string, binaryPath string) error {
 exec "%s" run %s
 `, binaryPath, hookType)
 
+	//nolint:gosec // G306: Hook script must be executable (0755)
 	if err := os.WriteFile(hookPath, []byte(content), 0755); err != nil {
 		return fmt.Errorf("failed to write hook: %w", err)
 	}

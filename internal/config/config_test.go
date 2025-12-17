@@ -15,6 +15,7 @@ hooks:
       tool: go
       args: ["test"]
 `
+	//nolint:gosec // G306: Test file, permissions not a concern
 	err := os.WriteFile(filepath.Join(dir, "hooks.yaml"), []byte(content), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +53,7 @@ func TestLoad_JSON(t *testing.T) {
     ]
   }
 }`
+	//nolint:gosec // G306: Test file, permissions not a concern
 	err := os.WriteFile(filepath.Join(dir, "hooks.json"), []byte(content), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -96,6 +98,7 @@ hooks:
     - name: test
       tool: go
 `
+	//nolint:gosec // G306: Test file, permissions not a concern
 	err := os.WriteFile(filepath.Join(dir, "hooks.yaml"), []byte(content), 0644)
 	if err != nil {
 		t.Fatal(err)

@@ -65,6 +65,7 @@ func (m *Manager) getCachedPath(name, version string) string {
 }
 
 func (m *Manager) downloadAndExtract(name, version, url, checksum string) error {
+	//nolint:gosec // G107: URL is from trusted config file
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
@@ -143,6 +144,7 @@ func (m *Manager) extractTarGz(src, dest, toolName string) error {
 			if err != nil {
 				return err
 			}
+			//nolint:gosec // G110: Trusted archive from configured URLs
 			if _, err := io.Copy(outFile, tr); err != nil {
 				outFile.Close()
 				return err
@@ -179,6 +181,7 @@ func (m *Manager) extractZip(src, dest, toolName string) error {
 				return err
 			}
 
+			//nolint:gosec // G110: Trusted archive from configured URLs
 			_, err = io.Copy(outFile, rc)
 			outFile.Close()
 			rc.Close()

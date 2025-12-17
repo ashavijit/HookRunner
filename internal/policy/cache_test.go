@@ -81,7 +81,9 @@ func TestCache_Clear(t *testing.T) {
 	policy := &RemotePolicy{Name: "clear-test"}
 	data := []byte("name: clear-test\n")
 
-	c.SaveToDisk(url, policy, data, "")
+	if err := c.SaveToDisk(url, policy, data, ""); err != nil {
+		t.Fatalf("SaveToDisk failed: %v", err)
+	}
 	c.SetInMemory(url, policy)
 
 	err := c.Clear()

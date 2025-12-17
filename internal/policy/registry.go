@@ -65,12 +65,16 @@ func (r *Registry) ClearCache() error {
 }
 
 func ValidatePolicy(p *RemotePolicy) error {
+	if p.Name == "" && p.ID != "" {
+		p.Name = p.ID
+	}
+
 	if p.Name == "" {
 		return fmt.Errorf("policy name required")
 	}
 
 	if p.Version != "" && p.Version != "local" {
-		versionPattern := regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+		versionPattern := regexp.MustCompile(`^\d+(\.\d+)*$`)
 		if !versionPattern.MatchString(p.Version) {
 			return fmt.Errorf("version must be semver or 'local': %s", p.Version)
 		}

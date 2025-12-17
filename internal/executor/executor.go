@@ -28,12 +28,15 @@ type Result struct {
 }
 
 type Options struct {
-	Verbose   bool
-	Quiet     bool
-	Fix       bool
-	FailFast  bool
-	SkipHooks []string
-	CommitMsg string
+	Verbose    bool
+	Quiet      bool
+	Fix        bool
+	FailFast   bool
+	DryRun     bool
+	JSONOutput bool
+	NoColor    bool
+	SkipHooks  []string
+	CommitMsg  string
 }
 
 type Executor struct {
@@ -72,17 +75,39 @@ func (e *Executor) Run(hookType string, files []string, allFiles bool) []Result 
 	}
 
 	executionPlan := graph.GetExecutionPlan()
+
+	// Dry-run mode: show what would run without executing
+	if e.opts.DryRun {
+		return e.dryRun(executionPlan, files, allFiles)
+	}
+
 	var results []Result
 	failed := false
+	totalHooks := 0
+	for _, batch := range executionPlan {
+		totalHooks += len(batch)
+	}
 
+	hookIndex := 0
 	for _, batch := range executionPlan {
 		if failed && e.opts.FailFast {
 			break
 		}
+
+		// Show progress for parallel batch
+		if !e.opts.Quiet && len(batch) > 1 && e.opts.Verbose {
+			names := make([]string, len(batch))
+			for i, h := range batch {
+				names[i] = h.Name
+			}
+			fmt.Printf("Running in parallel: %s\n", strings.Join(names, ", "))
+		}
+
 		batchResults := e.runBatch(batch, files, allFiles)
 		results = append(results, batchResults...)
 
 		for _, r := range batchResults {
+			hookIndex++
 			if !r.Success && !r.Skipped {
 				failed = true
 				if e.opts.FailFast {
@@ -90,6 +115,63 @@ func (e *Executor) Run(hookType string, files []string, allFiles bool) []Result 
 				}
 			}
 		}
+	}
+
+	return results
+}
+
+func (e *Executor) dryRun(executionPlan [][]config.Hook, files []string, allFiles bool) []Result {
+	var results []Result
+	cyan := color.New(color.FgCyan).SprintFunc()
+
+	fmt.Println(cyan("Dry-run mode: showing hooks that would execute"))
+	fmt.Println()
+
+	level := 1
+	for _, batch := range executionPlan {
+		if len(batch) > 1 {
+			fmt.Printf("Level %d (parallel):\n", level)
+		} else {
+			fmt.Printf("Level %d:\n", level)
+		}
+
+		for _, hook := range batch {
+			skip, reason := e.shouldSkip(hook)
+			if skip {
+				fmt.Printf("  ⊘ %s (would skip: %s)\n", hook.Name, reason)
+				results = append(results, Result{Name: hook.Name, Skipped: true, Success: true})
+				continue
+			}
+
+			matchedFiles := files
+			if !allFiles {
+				matchedFiles = e.filterFiles(files, hook)
+			}
+
+			if len(matchedFiles) == 0 && !allFiles {
+				fmt.Printf("  ⊘ %s (no matching files)\n", hook.Name)
+				results = append(results, Result{Name: hook.Name, Skipped: true, Success: true})
+				continue
+			}
+
+			args := hook.Args
+			if e.opts.Fix && len(hook.FixArgs) > 0 {
+				args = hook.FixArgs
+			}
+
+			fmt.Printf("  ▶ %s\n", hook.Name)
+			fmt.Printf("      tool: %s\n", hook.Tool)
+			fmt.Printf("      args: %v\n", args)
+			if !allFiles && len(matchedFiles) <= 5 {
+				fmt.Printf("      files: %v\n", matchedFiles)
+			} else if !allFiles {
+				fmt.Printf("      files: %d matching\n", len(matchedFiles))
+			}
+
+			results = append(results, Result{Name: hook.Name, Success: true})
+		}
+		level++
+		fmt.Println()
 	}
 
 	return results
@@ -329,9 +411,16 @@ func PrintResults(results []Result, verbose bool, quiet bool) {
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
+	cyan := color.New(color.FgCyan).SprintFunc()
+
+	var totalDuration time.Duration
+	passed, failed, skipped := 0, 0, 0
 
 	for _, r := range results {
+		totalDuration += r.Duration
+
 		if r.Skipped {
+			skipped++
 			if verbose {
 				fmt.Printf("%s %s (%v) - %s\n", yellow("[SKIP]"), r.Name, r.Duration.Round(time.Millisecond), r.Output)
 			}
@@ -339,11 +428,13 @@ func PrintResults(results []Result, verbose bool, quiet bool) {
 		}
 
 		if r.Success {
+			passed++
 			fmt.Printf("%s %s (%v)\n", green("[PASS]"), r.Name, r.Duration.Round(time.Millisecond))
 			if verbose && r.Output != "" {
 				fmt.Printf("  Output:\n%s\n", indent(r.Output))
 			}
 		} else {
+			failed++
 			fmt.Printf("%s %s (%v)\n", red("[FAIL]"), r.Name, r.Duration.Round(time.Millisecond))
 			if r.Error != nil {
 				fmt.Printf("  Error: %v\n", r.Error)
@@ -351,6 +442,23 @@ func PrintResults(results []Result, verbose bool, quiet bool) {
 			if r.Output != "" {
 				fmt.Printf("  Output:\n%s\n", indent(r.Output))
 			}
+		}
+	}
+
+	// Print summary
+	if len(results) > 0 {
+		fmt.Println()
+		summary := fmt.Sprintf("Ran %d hooks in %v", len(results), totalDuration.Round(time.Millisecond))
+		if skipped > 0 {
+			summary += fmt.Sprintf(" (%d passed, %d failed, %d skipped)", passed, failed, skipped)
+		} else {
+			summary += fmt.Sprintf(" (%d passed, %d failed)", passed, failed)
+		}
+
+		if failed > 0 {
+			fmt.Println(red(summary))
+		} else {
+			fmt.Println(cyan(summary))
 		}
 	}
 }

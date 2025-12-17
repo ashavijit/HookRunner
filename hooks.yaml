@@ -6,6 +6,26 @@ tools:
       linux: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-linux-amd64.tar.gz
       darwin: https://github.com/golangci/golangci-lint/releases/download/v1.55.2/golangci-lint-1.55.2-darwin-amd64.tar.gz
 
+# Policy configuration - remote + local
+policies:
+  type: raw
+  policies:
+    - url: https://hookrunner.avijitsen.site/policies/sensitive-secrets.yaml
+  localPolicies:
+    - name: commit-format
+      version: local
+      rules:
+        max_files_changed: 50
+        forbid_directories:
+          - vendor/
+          - node_modules/
+        forbid_file_extensions:
+          - .exe
+          - .dll
+        commit_message:
+          regex: "^(feat|fix|chore|docs|refactor|test|build|ci):"
+          error: "Commit must follow conventional format (feat|fix|chore|docs|refactor|test|build|ci):"
+
 hooks:
   pre-commit:
     - name: gofmt

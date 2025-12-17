@@ -123,6 +123,27 @@ func Evaluate(rules *PolicyRules, files []string, commitMsg string) EvalResult {
 		}
 	}
 
+	// Check regex_block patterns (from remote policies)
+	for _, pattern := range rules.RegexBlock {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			continue
+		}
+		for _, file := range files {
+			content, err := os.ReadFile(file)
+			if err != nil {
+				continue
+			}
+			if re.Match(content) {
+				desc := describeSecretPattern(pattern)
+				result.Violations = append(result.Violations, Violation{
+					Rule:    "secret_detected",
+					Message: fmt.Sprintf("%s in %s - remove before committing", desc, filepath.Base(file)),
+				})
+			}
+		}
+	}
+
 	if commitMsg != "" && rules.CommitMessage != nil {
 		cm := rules.CommitMessage
 		if cm.Regex != "" {
@@ -155,4 +176,28 @@ func (r EvalResult) String() string {
 		sb.WriteString(fmt.Sprintf("  ✗ [%s] %s\n", v.Rule, v.Message))
 	}
 	return sb.String()
+}
+
+// describeSecretPattern returns a user-friendly description for common secret patterns
+func describeSecretPattern(pattern string) string {
+	descriptions := map[string]string{
+		"AKIA[0-9A-Z]{16}":            "AWS Access Key",
+		"-----BEGIN PRIVATE KEY-----": "Private Key",
+		"-----BEGIN RSA PRIVATE KEY":  "RSA Private Key",
+		"(?i)password=":               "Hardcoded Password",
+		"ghp_[A-Za-z0-9_]{36}":        "GitHub Personal Access Token",
+		"gho_[A-Za-z0-9_]{36}":        "GitHub OAuth Token",
+		"github_pat_[A-Za-z0-9_]{22}": "GitHub PAT",
+		"sk-[A-Za-z0-9]{48}":          "OpenAI API Key",
+		"xox[baprs]-[A-Za-z0-9-]+":    "Slack Token",
+		"(?i)api[_-]?key":             "API Key",
+		"(?i)secret[_-]?key":          "Secret Key",
+	}
+
+	if desc, ok := descriptions[pattern]; ok {
+		return desc + " detected"
+	}
+
+	// For unknown patterns, provide a generic but clear message
+	return "Potential secret/credential detected"
 }

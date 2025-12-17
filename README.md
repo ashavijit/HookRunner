@@ -8,8 +8,9 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/ashavijit/hookrunner)](https://github.com/ashavijit/hookrunner/releases)
 [![Downloads](https://img.shields.io/github/downloads/ashavijit/hookrunner/total)](https://github.com/ashavijit/hookrunner/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/ashavijit/hookrunner/releases)
 
-A cross-platform pre-commit hook system with DAG-based execution, policy enforcement, and remote policy support.
+A cross-platform pre-commit hook system with DAG-based execution, policy enforcement, remote policy support, and secret detection.
 
 ---
 
@@ -125,6 +126,12 @@ go build -o hookrunner ./cmd/hookrunner
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/ashavijit/hookrunner/master/scripts/install.sh | bash
+```
+
+### Quick Install Script (Windows PowerShell)
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/ashavijit/hookrunner/master/scripts/install.ps1 | iex
 ```
 
 ### Pre-built Binaries

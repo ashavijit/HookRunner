@@ -6,10 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ashavijit/hookrunner/internal/config"
+	"github.com/ashavijit/hookrunner/internal/dag"
 	"github.com/ashavijit/hookrunner/internal/executor"
 	"github.com/ashavijit/hookrunner/internal/git"
 	"github.com/ashavijit/hookrunner/internal/policy"
@@ -26,6 +28,8 @@ var (
 	quiet      bool
 	fix        bool
 	noFailFast bool
+	dryRun     bool
+	noColor    bool
 	language   string
 )
 
@@ -117,17 +121,26 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var validateCmd = &cobra.Command{
+	Use:   "validate",
+	Short: "Validate configuration file",
+	Long:  "Validate hooks.yaml configuration file for syntax errors, missing tools, and DAG cycles",
+	RunE:  runValidate,
+}
+
 func init() {
 	runCmd.Flags().BoolVar(&allFiles, "all-files", false, "Run on all files")
 	runCmd.Flags().BoolVar(&verbose, "verbose", false, "Verbose output")
 	runCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Quiet output")
 	runCmd.Flags().BoolVar(&fix, "fix", false, "Run in fix mode")
 	runCmd.Flags().BoolVar(&noFailFast, "no-fail-fast", false, "Continue on failure")
+	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would run without executing")
+	runCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 
 	initCmd.Flags().StringVar(&language, "lang", "", "Language preset (go, nodejs, python, java, ruby, rust)")
 
 	policyCmd.AddCommand(policyListCmd, policyFetchCmd, policyClearCmd)
-	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, presetsCmd, policyCmd, versionCmd)
+	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, presetsCmd, policyCmd, versionCmd, validateCmd)
 }
 
 func Execute() error {
@@ -229,17 +242,34 @@ func runHook(cmd *cobra.Command, args []string) error {
 	toolMgr := tool.NewManager(cacheDir)
 	exec := executor.New(cfg, toolMgr, workDir)
 
+	if noColor {
+		color.NoColor = true
+	}
+
 	opts := executor.Options{
 		Verbose:   verbose,
 		Quiet:     quiet,
 		Fix:       fix,
 		FailFast:  !noFailFast,
+		DryRun:    dryRun,
+		NoColor:   noColor,
 		SkipHooks: executor.ParseSkipEnv(),
 	}
 	exec.SetOptions(opts)
 
+	policyResult := exec.CheckPolicies(files, "")
+	if policyResult != nil && !policyResult.Passed {
+		executor.PrintPolicyResult(policyResult, quiet)
+		fmt.Println()
+		os.Exit(1)
+	}
+
 	results := exec.Run(hookType, files, allFiles)
 	executor.PrintResults(results, verbose, quiet)
+
+	if policyResult != nil && !quiet {
+		executor.PrintPolicyResult(policyResult, quiet)
+	}
 
 	if executor.HasFailure(results) {
 		os.Exit(1)
@@ -414,6 +444,133 @@ func runPresets(cmd *cobra.Command, args []string) {
 
 	fmt.Println()
 	fmt.Println("Usage: hookrunner init --lang <language>")
+}
+
+func runValidate(cmd *cobra.Command, args []string) error {
+	green := color.New(color.FgGreen).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Validating configuration...")
+	fmt.Println()
+
+	errors := 0
+	warnings := 0
+
+	// Check 1: Config file exists and parses
+	cfg, cfgPath, err := config.Load(workDir)
+	if err != nil {
+		fmt.Printf("%s Config file: %v\n", red("[ERROR]"), err)
+		fmt.Println()
+		fmt.Println(yellow("Suggestion:") + " Run 'hookrunner init' to create a config file")
+		return nil
+	}
+	fmt.Printf("%s Config file: %s\n", green("[OK]"), cfgPath)
+
+	// Check 2: Hooks exist
+	hookTypes := []string{"pre-commit", "pre-push", "commit-msg"}
+	totalHooks := 0
+	for _, hookType := range hookTypes {
+		hooks := cfg.GetHooks(hookType)
+		totalHooks += len(hooks)
+	}
+	if totalHooks == 0 {
+		fmt.Printf("%s No hooks configured\n", yellow("[WARN]"))
+		warnings++
+	} else {
+		fmt.Printf("%s Hooks configured: %d\n", green("[OK]"), totalHooks)
+	}
+
+	// Check 3: DAG has no cycles
+	for _, hookType := range hookTypes {
+		hooks := cfg.GetHooks(hookType)
+		if len(hooks) == 0 {
+			continue
+		}
+
+		graph := dag.BuildGraph(hooks)
+		if graph.HasCycle() {
+			fmt.Printf("%s %s hooks have circular dependency\n", red("[ERROR]"), hookType)
+			fmt.Println(yellow("Suggestion:") + " Check 'after' fields for cycles")
+			errors++
+		} else {
+			fmt.Printf("%s %s DAG is valid\n", green("[OK]"), hookType)
+		}
+
+		// Check 4: Hook names are unique
+		names := make(map[string]bool)
+		for _, h := range hooks {
+			if names[h.Name] {
+				fmt.Printf("%s Duplicate hook name '%s' in %s\n", red("[ERROR]"), h.Name, hookType)
+				errors++
+			}
+			names[h.Name] = true
+		}
+
+		// Check 5: 'after' references exist
+		for _, h := range hooks {
+			if h.After != "" && !names[h.After] {
+				fmt.Printf("%s Hook '%s' references unknown hook '%s' in 'after'\n", red("[ERROR]"), h.Name, h.After)
+				errors++
+			}
+		}
+
+		// Check 6: Regex patterns are valid
+		for _, h := range hooks {
+			if h.Files != "" {
+				if _, err := regexp.Compile(h.Files); err != nil {
+					fmt.Printf("%s Hook '%s' has invalid 'files' regex: %v\n", red("[ERROR]"), h.Name, err)
+					errors++
+				}
+			}
+			if h.Exclude != "" {
+				if _, err := regexp.Compile(h.Exclude); err != nil {
+					fmt.Printf("%s Hook '%s' has invalid 'exclude' regex: %v\n", red("[ERROR]"), h.Name, err)
+					errors++
+				}
+			}
+		}
+	}
+
+	// Check 7: Tools are available
+	cacheDir := filepath.Join(workDir, ".hooks", "cache")
+	toolMgr := tool.NewManager(cacheDir)
+	checkedTools := make(map[string]bool)
+
+	for _, hookType := range hookTypes {
+		for _, h := range cfg.GetHooks(hookType) {
+			if checkedTools[h.Tool] {
+				continue
+			}
+			checkedTools[h.Tool] = true
+
+			_, err := toolMgr.EnsureTool(h.Tool, cfg.GetTool(h.Tool))
+			if err != nil {
+				fmt.Printf("%s Tool '%s' not available: %v\n", yellow("[WARN]"), h.Tool, err)
+				warnings++
+			} else {
+				fmt.Printf("%s Tool '%s' found\n", green("[OK]"), h.Tool)
+			}
+		}
+	}
+
+	// Summary
+	fmt.Println()
+	if errors > 0 {
+		fmt.Printf("%s Validation failed with %d error(s) and %d warning(s)\n", red("[FAIL]"), errors, warnings)
+		os.Exit(1)
+	} else if warnings > 0 {
+		fmt.Printf("%s Validation passed with %d warning(s)\n", yellow("[WARN]"), warnings)
+	} else {
+		fmt.Printf("%s Configuration is valid\n", green("[OK]"))
+	}
+
+	return nil
 }
 
 func runPolicyList(cmd *cobra.Command, args []string) error {

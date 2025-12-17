@@ -15,19 +15,21 @@ case "$ARCH" in
 esac
 
 if [ "$VERSION" = "latest" ]; then
-  VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+  VERSION=$(curl -sSL "https://raw.githubusercontent.com/$REPO/master/VERSION" 2>/dev/null || echo "v0.1.1")
+  VERSION=$(echo "$VERSION" | tr -d '\n\r')
 fi
 
 BINARY="hookrunner-${OS}-${ARCH}"
 URL="https://github.com/$REPO/releases/download/$VERSION/$BINARY"
 
+echo ""
 echo "Installing hookrunner $VERSION..."
 echo "  OS: $OS"
 echo "  Arch: $ARCH"
-echo "  URL: $URL"
+echo ""
 
 TMP_FILE=$(mktemp)
-curl -sSL "$URL" -o "$TMP_FILE"
+curl -sSL "$URL" -o "$TMP_FILE" || { echo "Download failed: $URL"; exit 1; }
 chmod +x "$TMP_FILE"
 
 if [ -w "$INSTALL_DIR" ]; then
@@ -36,5 +38,5 @@ else
   sudo mv "$TMP_FILE" "$INSTALL_DIR/hookrunner"
 fi
 
-echo "Installed hookrunner to $INSTALL_DIR/hookrunner"
-hookrunner version
+echo "Installed to $INSTALL_DIR/hookrunner"
+hookrunner version 2>/dev/null || true

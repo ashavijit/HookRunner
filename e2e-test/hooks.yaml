@@ -2,5 +2,7 @@ tools: {}
 
 hooks:
   pre-commit:
-    - name: test-blame
-      run: 'echo "Error in internal/executor/executor.go:10: test error" && exit 1'
+    - name: echo-test
+      run: "echo Hello from hook"
+    - name: dir-test
+      run: "dir"

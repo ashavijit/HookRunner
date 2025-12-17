@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ashavijit/hookrunner/internal/cache"
 	"github.com/ashavijit/hookrunner/internal/config"
 	"github.com/ashavijit/hookrunner/internal/dag"
 	"github.com/ashavijit/hookrunner/internal/git"
@@ -36,6 +37,7 @@ type Options struct {
 	DryRun     bool
 	JSONOutput bool
 	NoColor    bool
+	NoCache    bool
 	SkipHooks  []string
 	CommitMsg  string
 }
@@ -45,14 +47,17 @@ type Executor struct {
 	config  *config.Config
 	workDir string
 	opts    Options
+	cache   *cache.FileCache
 }
 
 func New(cfg *config.Config, toolMgr *tool.Manager, workDir string) *Executor {
+	cacheDir := filepath.Join(workDir, ".hooks", "cache")
 	return &Executor{
 		toolMgr: toolMgr,
 		config:  cfg,
 		workDir: workDir,
 		opts:    Options{FailFast: true},
+		cache:   cache.New(cacheDir),
 	}
 }
 
@@ -311,13 +316,24 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 		return result
 	}
 
+	matchedFiles := files
 	if !allFiles {
-		matched := e.filterFiles(files, hook)
-		if len(matched) == 0 {
+		matchedFiles = e.filterFiles(files, hook)
+		if len(matchedFiles) == 0 {
 			result.Skipped = true
 			result.Success = true
 			result.Duration = time.Since(start)
 			result.Output = "skipped (no matching files)"
+			return result
+		}
+	}
+
+	if !e.opts.NoCache && e.cache != nil {
+		if cached, ok := e.cache.Get(hook.Name, matchedFiles); ok {
+			result.Success = cached.Success
+			result.Output = cached.Output + " (cached)"
+			result.Duration = time.Since(start)
+			result.Skipped = true
 			return result
 		}
 	}
@@ -398,6 +414,9 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 	}
 
 	result.Success = true
+	if !e.opts.NoCache && e.cache != nil {
+		e.cache.Set(hook.Name, matchedFiles, result.Success, result.Output)
+	}
 	return result
 }
 

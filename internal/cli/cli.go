@@ -30,6 +30,7 @@ var (
 	noFailFast bool
 	dryRun     bool
 	noColor    bool
+	noCache    bool
 	language   string
 )
 
@@ -136,6 +137,7 @@ func init() {
 	runCmd.Flags().BoolVar(&noFailFast, "no-fail-fast", false, "Continue on failure")
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would run without executing")
 	runCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
+	runCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable result caching")
 
 	initCmd.Flags().StringVar(&language, "lang", "", "Language preset (go, nodejs, python, java, ruby, rust)")
 
@@ -253,6 +255,7 @@ func runHook(cmd *cobra.Command, args []string) error {
 		FailFast:  !noFailFast,
 		DryRun:    dryRun,
 		NoColor:   noColor,
+		NoCache:   noCache,
 		SkipHooks: executor.ParseSkipEnv(),
 	}
 	exec.SetOptions(opts)

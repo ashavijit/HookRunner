@@ -102,3 +102,32 @@ func IsInsideWorkTree() bool {
 	}
 	return strings.TrimSpace(string(out)) == "true"
 }
+
+
+func CreateCleanRoom() (string, error) {
+	repoRoot, err := FindRepoRoot()
+	if err != nil {
+		return "", err
+	}
+
+	tempDir, err := os.MkdirTemp("", "hookrunner-cleanroom-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	cmd := exec.Command("git", "checkout-index", "--all", "--prefix="+tempDir+"/")
+	cmd.Dir = repoRoot
+	if output, err := cmd.CombinedOutput(); err != nil {
+		os.RemoveAll(tempDir)
+		return "", fmt.Errorf("failed to extract staged files: %w\n%s", err, string(output))
+	}
+
+	return tempDir, nil
+}
+
+func CleanupCleanRoom(path string) error {
+	if path == "" {
+		return nil
+	}
+	return os.RemoveAll(path)
+}

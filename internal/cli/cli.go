@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -30,6 +31,7 @@ var (
 	noFailFast bool
 	dryRun     bool
 	noColor    bool
+	cleanRoom  bool
 	language   string
 )
 
@@ -136,6 +138,7 @@ func init() {
 	runCmd.Flags().BoolVar(&noFailFast, "no-fail-fast", false, "Continue on failure")
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would run without executing")
 	runCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
+	runCmd.Flags().BoolVar(&cleanRoom, "clean-room", false, "Run hooks in an isolated directory with only staged files")
 
 	initCmd.Flags().StringVar(&language, "lang", "", "Language preset (go, nodejs, python, java, ruby, rust)")
 
@@ -206,6 +209,18 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// promptConfirm asks the user for confirmation and returns true if they answer 'y' or 'Y'.
+func promptConfirm(message string) bool {
+	fmt.Printf("%s [y/N]: ", message)
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes"
+}
+
 func runHook(cmd *cobra.Command, args []string) error {
 	hookType := args[0]
 	workDir, err := os.Getwd()
@@ -238,9 +253,35 @@ func runHook(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	executionDir := workDir
+	if cleanRoom {
+		yellow := color.New(color.FgYellow).SprintFunc()
+		fmt.Println(yellow("Clean-room mode:"), "Hooks will run in an isolated temporary directory")
+		fmt.Println(yellow("Warning:"), "This excludes all unstaged changes and untracked files.")
+		fmt.Println()
+
+		if !promptConfirm("Proceed with clean-room execution?") {
+			fmt.Println("Aborted.")
+			return nil
+		}
+
+		cleanRoomDir, crErr := git.CreateCleanRoom()
+		if crErr != nil {
+			return fmt.Errorf("failed to create clean-room: %w", crErr)
+		}
+		defer func() {
+			if cleanupErr := git.CleanupCleanRoom(cleanRoomDir); cleanupErr != nil {
+				fmt.Printf("Warning: failed to clean up temp directory: %v\n", cleanupErr)
+			}
+		}()
+
+		executionDir = cleanRoomDir
+		fmt.Printf("Running hooks in: %s\n\n", executionDir)
+	}
+
 	cacheDir := filepath.Join(workDir, ".hooks", "cache")
 	toolMgr := tool.NewManager(cacheDir)
-	exec := executor.New(cfg, toolMgr, workDir)
+	exec := executor.New(cfg, toolMgr, executionDir)
 
 	if noColor {
 		color.NoColor = true

@@ -1,12 +1,9 @@
 # HookRunner FluxFile
 # Modern task runner configuration - alternative to Makefile
-# Usage: flux build, flux test, flux release
+# Usage: flux -t build, flux -t test, flux -l
 
 var PROJECT = hookrunner
-var VERSION = $(shell "cat VERSION 2>/dev/null || echo dev")
-var GIT_COMMIT = $(shell "git rev-parse --short HEAD 2>/dev/null || echo unknown")
-var BUILD_DATE = $(shell "date -u +%Y-%m-%dT%H:%M:%SZ")
-var LDFLAGS = -s -w -X github.com/ashavijit/hookrunner/internal/version.Version=${VERSION} -X github.com/ashavijit/hookrunner/internal/version.GitCommit=${GIT_COMMIT} -X github.com/ashavijit/hookrunner/internal/version.BuildDate=${BUILD_DATE}
+var VERSION = v0.26.0
 
 # ============================================================
 # Build Tasks
@@ -21,21 +18,20 @@ task build:
         go.mod
         go.sum
     outputs:
-        ${PROJECT}
         ${PROJECT}.exe
     run:
-        go build -ldflags="${LDFLAGS}" -o ${PROJECT} ./cmd/hookrunner
+        go build -ldflags="-s -w" -o ${PROJECT}.exe ./cmd/hookrunner
 
 task build-dev:
     desc: Fast development build with debug info
     run:
-        go build -o ${PROJECT} ./cmd/hookrunner
+        go build -o ${PROJECT}.exe ./cmd/hookrunner
 
 task install:
     desc: Install hookrunner to GOPATH/bin
     deps: fmt, vet
     run:
-        go install -ldflags="${LDFLAGS}" ./cmd/hookrunner
+        go install -ldflags="-s -w" ./cmd/hookrunner
 
 # ============================================================
 # Code Quality
@@ -72,7 +68,6 @@ task test-coverage:
     run:
         go test ./... -coverprofile=coverage.out
         go tool cover -html=coverage.out -o coverage.html
-        echo "Coverage report: coverage.html"
 
 task test-race:
     desc: Run tests with race detector
@@ -91,62 +86,40 @@ task dev:
         **/*_test.go
         .git/**
     run:
-        go build -o ${PROJECT} ./cmd/hookrunner
-        ./${PROJECT} version
+        go build -o ${PROJECT}.exe ./cmd/hookrunner
+        ./${PROJECT}.exe version
 
 task hooks:
     desc: Install git hooks
     deps: build
     run:
-        ./${PROJECT} install
-
-task run:
-    desc: Run hookrunner with args
-    deps: build
-    run:
-        ./${PROJECT}
+        ./${PROJECT}.exe install
 
 # ============================================================
 # Release
 # ============================================================
 
-task release:
-    desc: Cross-compile for all platforms
-    deps: test
-    parallel: true
-    run:
-        mkdir -p dist
-
 task release-linux:
     desc: Build Linux binaries
-    env:
-        GOOS = linux
     run:
-        GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/${PROJECT}-linux-amd64 ./cmd/hookrunner
-        GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/${PROJECT}-linux-arm64 ./cmd/hookrunner
+        $env:GOOS="linux"; $env:GOARCH="amd64"; go build -ldflags="-s -w" -o dist/${PROJECT}-linux-amd64 ./cmd/hookrunner
 
 task release-darwin:
     desc: Build macOS binaries
-    env:
-        GOOS = darwin
     run:
-        GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/${PROJECT}-darwin-amd64 ./cmd/hookrunner
-        GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/${PROJECT}-darwin-arm64 ./cmd/hookrunner
+        $env:GOOS="darwin"; $env:GOARCH="amd64"; go build -ldflags="-s -w" -o dist/${PROJECT}-darwin-amd64 ./cmd/hookrunner
 
 task release-windows:
     desc: Build Windows binaries
-    env:
-        GOOS = windows
     run:
-        GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/${PROJECT}-windows-amd64.exe ./cmd/hookrunner
+        go build -ldflags="-s -w" -o dist/${PROJECT}-windows-amd64.exe ./cmd/hookrunner
 
 task release-all:
     desc: Build for all platforms
     deps: release-linux, release-darwin, release-windows
     parallel: true
     run:
-        cd dist && sha256sum ${PROJECT}-* > checksums.txt
-        ls -lh dist/
+        echo "All platforms built!"
 
 # ============================================================
 # Cleanup
@@ -155,9 +128,9 @@ task release-all:
 task clean:
     desc: Remove build artifacts
     run:
-        rm -f ${PROJECT} ${PROJECT}.exe
-        rm -f coverage.out coverage.html
-        rm -rf dist/
+        Remove-Item -Force -ErrorAction SilentlyContinue ${PROJECT}.exe
+        Remove-Item -Force -ErrorAction SilentlyContinue coverage.out, coverage.html
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue dist/
 
 # ============================================================
 # Utilities
@@ -168,27 +141,22 @@ task size:
     run:
         echo "=== Binary Size Comparison ==="
         echo "Optimized build:"
-        go build -ldflags="-s -w" -o /tmp/${PROJECT}-opt ./cmd/hookrunner
-        du -h /tmp/${PROJECT}-opt
+        go build -ldflags="-s -w" -o hookrunner_opt.exe ./cmd/hookrunner
+        Get-Item hookrunner_opt.exe | Select-Object Name, @{N='Size';E={"{0:N2} MB" -f ($_.Length/1MB)}}
         echo "Debug build:"
-        go build -o /tmp/${PROJECT}-dbg ./cmd/hookrunner
-        du -h /tmp/${PROJECT}-dbg
-        rm -f /tmp/${PROJECT}-opt /tmp/${PROJECT}-dbg
+        go build -o hookrunner_dbg.exe ./cmd/hookrunner
+        Get-Item hookrunner_dbg.exe | Select-Object Name, @{N='Size';E={"{0:N2} MB" -f ($_.Length/1MB)}}
+        Remove-Item -Force hookrunner_opt.exe, hookrunner_dbg.exe
 
 task doctor:
     desc: Check development environment
     run:
         echo "Go version:"
         go version
-        echo ""
-        echo "golangci-lint version:"
-        golangci-lint version || echo "Not installed"
-        echo ""
         echo "Git version:"
         git version
-        echo ""
         echo "HookRunner version:"
-        ./${PROJECT} version 2>/dev/null || echo "Not built yet"
+        ./${PROJECT}.exe version
 
 # ============================================================
 # Profiles
@@ -202,4 +170,3 @@ profile dev:
 profile prod:
     env:
         CGO_ENABLED = 0
-        GOPROXY = https://proxy.golang.org,direct

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub Action** - Official action for CI/CD integration (`ashavijit/hookrunner-action`)
 - Sample Lua policies in `samples/lua-policies/`
 
+### Fixed
+- **Self-Healing Hooks** - Hook scripts now find `hookrunner` dynamically at runtime
+  - Prevents frustrating "No such file or directory" errors
+  - Search order: installed path → PATH → common locations → current directory
+  - Shows helpful installation instructions if not found
+
 ### Changed
 - Updated gopher-lua dependency for Lua VM support
 

@@ -401,6 +401,9 @@ Level 3:    [integration]
 | `--fix` | Enable auto-fix mode (uses fix_args) |
 | `--no-fail-fast` | Continue execution after failures |
 | `--quiet` | Suppress output except errors |
+| `--dry-run` | Show what would run without executing |
+| `--clean-room` | Run hooks in an isolated temp directory with only staged files (CI parity) |
+
 
 ### Environment Variables
 

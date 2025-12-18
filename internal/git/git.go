@@ -64,9 +64,53 @@ func InstallHook(hookType string, binaryPath string) error {
 
 	hookPath := filepath.Join(hooksDir, hookType)
 	binaryPath = strings.ReplaceAll(binaryPath, "\\", "/")
+
+	// Generate a smart hook script that finds hookrunner dynamically
+	// This prevents the frustrating "No such file or directory" error
+	// when the binary path changes (reinstall, different machine, etc.)
 	content := fmt.Sprintf(`#!/bin/sh
-exec "%s" run %s
-`, binaryPath, hookType)
+# HookRunner - Auto-generated hook script
+# This script finds hookrunner dynamically to avoid path issues
+
+# Try the installed path first
+if [ -x "%s" ]; then
+    exec "%s" run %s "$@"
+fi
+
+# Try finding hookrunner in PATH
+if command -v hookrunner >/dev/null 2>&1; then
+    exec hookrunner run %s "$@"
+fi
+
+# Try common installation locations
+for dir in "$GOPATH/bin" "$HOME/go/bin" "$HOME/.local/bin" "/usr/local/bin" "."; do
+    if [ -x "$dir/hookrunner" ]; then
+        exec "$dir/hookrunner" run %s "$@"
+    fi
+    # Windows executable
+    if [ -x "$dir/hookrunner.exe" ]; then
+        exec "$dir/hookrunner.exe" run %s "$@"
+    fi
+done
+
+# Try the current directory (for development)
+if [ -x "./hookrunner" ]; then
+    exec ./hookrunner run %s "$@"
+fi
+if [ -x "./hookrunner.exe" ]; then
+    exec ./hookrunner.exe run %s "$@"
+fi
+
+echo "ERROR: hookrunner not found!"
+echo ""
+echo "Please install hookrunner using one of these methods:"
+echo "  go install github.com/ashavijit/hookrunner/cmd/hookrunner@latest"
+echo "  curl -sSL https://raw.githubusercontent.com/ashavijit/hookrunner/master/scripts/install.sh | bash"
+echo ""
+echo "Or reinstall hooks after building:"
+echo "  hookrunner install"
+exit 1
+`, binaryPath, binaryPath, hookType, hookType, hookType, hookType, hookType, hookType)
 
 	//nolint:gosec // G306: Hook script must be executable (0755)
 	if err := os.WriteFile(hookPath, []byte(content), 0755); err != nil {

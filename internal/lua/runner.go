@@ -60,7 +60,11 @@ func (r *Runner) RunPolicy(scriptPath string, files []string) ([]PolicyResult, e
 	L.SetGlobal("match", L.NewFunction(func(L *lua.LState) int {
 		str := L.CheckString(1)
 		pattern := L.CheckString(2)
-		matched, _ := filepath.Match(pattern, str)
+		matched, err := filepath.Match(pattern, str)
+		if err != nil {
+			L.Push(lua.LBool(false))
+			return 1
+		}
 		L.Push(lua.LBool(matched))
 		return 1
 	}))
@@ -79,7 +83,10 @@ func (r *Runner) RunPolicy(scriptPath string, files []string) ([]PolicyResult, e
 	checkFn := L.GetGlobal("check")
 	if checkFn.Type() == lua.LTFunction {
 		for _, file := range files {
-			content, _ := os.ReadFile(filepath.Join(r.workDir, file))
+			content, err := os.ReadFile(filepath.Join(r.workDir, file))
+			if err != nil {
+				content = []byte{} // Empty content if file can't be read
+			}
 
 			if err := L.CallByParam(lua.P{
 				Fn:      checkFn,

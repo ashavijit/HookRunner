@@ -1,0 +1,19 @@
+
+
+FluxFile linguist-language=YAML
+**/FluxFile linguist-language=YAML
+
+FluxFile linguist-detectable=true
+
+* text=auto
+
+*.go text eol=lf
+
+*.sh text eol=lf
+*.bash text eol=lf
+
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+Makefile text eol=lf

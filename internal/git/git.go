@@ -103,7 +103,6 @@ func IsInsideWorkTree() bool {
 	return strings.TrimSpace(string(out)) == "true"
 }
 
-
 func CreateCleanRoom() (string, error) {
 	repoRoot, err := FindRepoRoot()
 	if err != nil {

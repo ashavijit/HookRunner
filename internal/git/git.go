@@ -68,37 +68,38 @@ func InstallHook(hookType string, binaryPath string) error {
 	// Generate a smart hook script that finds hookrunner dynamically
 	// This prevents the frustrating "No such file or directory" error
 	// when the binary path changes (reinstall, different machine, etc.)
+	// NOTE: We don't pass "$@" because hookrunner run only accepts the hook type
 	content := fmt.Sprintf(`#!/bin/sh
 # HookRunner - Auto-generated hook script
 # This script finds hookrunner dynamically to avoid path issues
 
 # Try the installed path first
 if [ -x "%s" ]; then
-    exec "%s" run %s "$@"
+    exec "%s" run %s
 fi
 
 # Try finding hookrunner in PATH
 if command -v hookrunner >/dev/null 2>&1; then
-    exec hookrunner run %s "$@"
+    exec hookrunner run %s
 fi
 
 # Try common installation locations
 for dir in "$GOPATH/bin" "$HOME/go/bin" "$HOME/.local/bin" "/usr/local/bin" "."; do
     if [ -x "$dir/hookrunner" ]; then
-        exec "$dir/hookrunner" run %s "$@"
+        exec "$dir/hookrunner" run %s
     fi
     # Windows executable
     if [ -x "$dir/hookrunner.exe" ]; then
-        exec "$dir/hookrunner.exe" run %s "$@"
+        exec "$dir/hookrunner.exe" run %s
     fi
 done
 
 # Try the current directory (for development)
 if [ -x "./hookrunner" ]; then
-    exec ./hookrunner run %s "$@"
+    exec ./hookrunner run %s
 fi
 if [ -x "./hookrunner.exe" ]; then
-    exec ./hookrunner.exe run %s "$@"
+    exec ./hookrunner.exe run %s
 fi
 
 echo "ERROR: hookrunner not found!"

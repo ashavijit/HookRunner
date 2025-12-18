@@ -220,24 +220,53 @@ func (e *Executor) CheckPolicies(files []string, commitMsg string) *policy.EvalR
 	result := policy.Evaluate(&merged.EffectiveRules, files, commitMsg)
 
 	if len(p.LuaScripts) > 0 {
-		luaRunner := luapkg.NewRunner(e.workDir)
+		type luaResult struct {
+			script     string
+			violations []policy.Violation
+			err        error
+		}
+
+		results := make(chan luaResult, len(p.LuaScripts))
+		var wg sync.WaitGroup
+
 		for _, script := range p.LuaScripts {
-			scriptPath := filepath.Join(e.workDir, script)
-			luaResults, err := luaRunner.RunPolicy(scriptPath, files)
-			if err != nil {
+			wg.Add(1)
+			go func(s string) {
+				defer wg.Done()
+				luaRunner := luapkg.NewRunner(e.workDir)
+				scriptPath := filepath.Join(e.workDir, s)
+				luaResults, err := luaRunner.RunPolicy(scriptPath, files)
+
+				lr := luaResult{script: s}
+				if err != nil {
+					lr.err = err
+				} else {
+					for _, r := range luaResults {
+						if !r.Passed {
+							lr.violations = append(lr.violations, policy.Violation{
+								Rule:    "lua_policy",
+								Message: r.Message,
+							})
+						}
+					}
+				}
+				results <- lr
+			}(script)
+		}
+
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		for lr := range results {
+			if lr.err != nil {
 				result.Violations = append(result.Violations, policy.Violation{
 					Rule:    "lua_script",
-					Message: fmt.Sprintf("Lua error in %s: %v", script, err),
+					Message: fmt.Sprintf("Lua error in %s: %v", lr.script, lr.err),
 				})
-				continue
-			}
-			for _, lr := range luaResults {
-				if !lr.Passed {
-					result.Violations = append(result.Violations, policy.Violation{
-						Rule:    "lua_policy",
-						Message: lr.Message,
-					})
-				}
+			} else {
+				result.Violations = append(result.Violations, lr.violations...)
 			}
 		}
 		result.Passed = len(result.Violations) == 0

@@ -1,7 +1,9 @@
 package executor
 
 import (
+	"os"
 	"testing"
+	"time"
 
 	"github.com/ashavijit/hookrunner/internal/config"
 	"github.com/ashavijit/hookrunner/internal/tool"
@@ -31,6 +33,7 @@ func TestSetOptions(t *testing.T) {
 		Quiet:     false,
 		Fix:       true,
 		FailFast:  false,
+		UseCache:  true,
 		SkipHooks: []string{"lint"},
 	}
 	exec.SetOptions(opts)
@@ -41,6 +44,10 @@ func TestSetOptions(t *testing.T) {
 
 	if exec.opts.Fix != true {
 		t.Error("Fix should be true")
+	}
+
+	if exec.opts.UseCache != true {
+		t.Error("UseCache should be true")
 	}
 }
 
@@ -53,6 +60,47 @@ func TestRun_NoHooks(t *testing.T) {
 
 	if results != nil {
 		t.Error("expected nil results for no hooks")
+	}
+}
+
+func TestRun_WithCycleDetection(t *testing.T) {
+	cfg := &config.Config{
+		Hooks: map[string][]config.Hook{
+			"pre-commit": {
+				{Name: "a", Tool: "echo", After: "b"},
+				{Name: "b", Tool: "echo", After: "a"},
+			},
+		},
+	}
+	toolMgr := tool.NewManager("/tmp/cache")
+	exec := New(cfg, toolMgr, "/tmp/work")
+
+	results := exec.Run("pre-commit", []string{"test.go"}, false)
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Success {
+		t.Error("expected failure due to cycle")
+	}
+}
+
+func TestRun_DryRun(t *testing.T) {
+	cfg := &config.Config{
+		Hooks: map[string][]config.Hook{
+			"pre-commit": {
+				{Name: "test", Tool: "echo", Args: []string{"hello"}},
+			},
+		},
+	}
+	toolMgr := tool.NewManager("/tmp/cache")
+	exec := New(cfg, toolMgr, t.TempDir())
+	exec.SetOptions(Options{DryRun: true, Quiet: true})
+
+	results := exec.Run("pre-commit", []string{"test.go"}, true)
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
 	}
 }
 
@@ -130,9 +178,19 @@ func TestHasFailure_Skipped(t *testing.T) {
 }
 
 func TestParseSkipEnv(t *testing.T) {
+	_ = os.Setenv("SKIP", "lint,test")
 	result := ParseSkipEnv()
-	if len(result) > 0 {
-		t.Logf("SKIP env: %v", result)
+	if len(result) != 2 {
+		t.Errorf("expected 2 items, got %d", len(result))
+	}
+	_ = os.Unsetenv("SKIP")
+}
+
+func TestParseSkipEnv_Empty(t *testing.T) {
+	_ = os.Unsetenv("SKIP")
+	result := ParseSkipEnv()
+	if result != nil {
+		t.Error("expected nil for empty SKIP env")
 	}
 }
 
@@ -143,6 +201,66 @@ func TestPrintResults_Quiet(t *testing.T) {
 	PrintResults(results, false, true)
 }
 
+func TestPrintResults_Verbose(t *testing.T) {
+	results := []Result{
+		{Name: "pass", Success: true, Duration: time.Millisecond * 100, Output: "output"},
+		{Name: "fail", Success: false, Duration: time.Millisecond * 200, Output: "error"},
+		{Name: "skip", Success: true, Skipped: true, Duration: time.Millisecond * 50},
+	}
+	PrintResults(results, true, false)
+}
+
 func TestPrintPolicyResult_Nil(t *testing.T) {
 	PrintPolicyResult(nil, false)
+}
+
+func TestClearCache(t *testing.T) {
+	cfg := &config.Config{}
+	toolMgr := tool.NewManager("/tmp/cache")
+	exec := New(cfg, toolMgr, t.TempDir())
+
+	err := exec.ClearCache()
+	if err != nil {
+		t.Errorf("ClearCache failed: %v", err)
+	}
+}
+
+func TestResult_Fields(t *testing.T) {
+	r := Result{
+		Name:     "test",
+		Success:  true,
+		Skipped:  false,
+		Duration: time.Second,
+		Output:   "output",
+		Error:    nil,
+	}
+
+	if r.Name != "test" {
+		t.Error("Name mismatch")
+	}
+	if !r.Success {
+		t.Error("Success should be true")
+	}
+}
+
+func TestOptions_Fields(t *testing.T) {
+	o := Options{
+		Verbose:    true,
+		Quiet:      false,
+		Fix:        true,
+		FailFast:   true,
+		DryRun:     true,
+		JSONOutput: true,
+		NoColor:    true,
+		UseCache:   true,
+		SkipHooks:  []string{"a", "b"},
+		CommitMsg:  "test",
+	}
+
+	if !o.Verbose {
+		t.Error("Verbose should be true")
+	}
+	if !o.UseCache {
+		t.Error("UseCache should be true")
+	}
 }

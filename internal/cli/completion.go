@@ -140,7 +140,6 @@ func appendToProfile(path string, content string) error {
 	}
 	defer f.Close()
 
-	// Check if already present to avoid duplicates (naive check)
 	data, err := os.ReadFile(path)
 	if err == nil {
 		if strings.Contains(string(data), "# HookRunner completion") {
@@ -148,9 +147,8 @@ func appendToProfile(path string, content string) error {
 			return nil
 		}
 	} else if !os.IsNotExist(err) {
-		// If read fails for other reasons, we might want to know, but proceeding is risky
-		// However, since we just opened it for write, it should exist.
-		// Let's just ignore the read error if we can't read it, but check error to satisfy linter.
+		// If read fails for other reasons, report it
+		return fmt.Errorf("failed to read profile for duplicate check: %w", err)
 	}
 
 	if _, err := f.WriteString(content); err != nil {

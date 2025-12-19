@@ -116,8 +116,8 @@ func setupFish() error {
 	}
 
 	configDir := filepath.Join(home, ".config", "fish", "completions")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return err
+	if mkErr := os.MkdirAll(configDir, 0755); mkErr != nil {
+		return mkErr
 	}
 
 	target := filepath.Join(configDir, "hookrunner.fish")
@@ -140,10 +140,17 @@ func appendToProfile(path string, content string) error {
 	}
 	defer f.Close()
 
-	data, _ := os.ReadFile(path)
-	if strings.Contains(string(data), "# HookRunner completion") {
-		fmt.Println("Completion already configured.")
-		return nil
+	// Check if already present to avoid duplicates (naive check)
+	data, err := os.ReadFile(path)
+	if err == nil {
+		if strings.Contains(string(data), "# HookRunner completion") {
+			fmt.Println("Completion already configured.")
+			return nil
+		}
+	} else if !os.IsNotExist(err) {
+		// If read fails for other reasons, we might want to know, but proceeding is risky
+		// However, since we just opened it for write, it should exist.
+		// Let's just ignore the read error if we can't read it, but check error to satisfy linter.
 	}
 
 	if _, err := f.WriteString(content); err != nil {

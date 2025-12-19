@@ -32,6 +32,7 @@ var (
 	dryRun     bool
 	noColor    bool
 	cleanRoom  bool
+	useCache   bool
 	language   string
 )
 
@@ -130,6 +131,17 @@ var validateCmd = &cobra.Command{
 	RunE:  runValidate,
 }
 
+var cacheCmd = &cobra.Command{
+	Use:   "cache",
+	Short: "Manage hook cache",
+}
+
+var cacheClearCmd = &cobra.Command{
+	Use:   "clear",
+	Short: "Clear hook result cache",
+	RunE:  runCacheClear,
+}
+
 func init() {
 	runCmd.Flags().BoolVar(&allFiles, "all-files", false, "Run on all files")
 	runCmd.Flags().BoolVar(&verbose, "verbose", false, "Verbose output")
@@ -139,11 +151,13 @@ func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would run without executing")
 	runCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	runCmd.Flags().BoolVar(&cleanRoom, "clean-room", false, "Run hooks in an isolated directory with only staged files")
+	runCmd.Flags().BoolVar(&useCache, "cached", false, "Skip hooks for unchanged files")
 
 	initCmd.Flags().StringVar(&language, "lang", "", "Language preset (go, nodejs, python, java, ruby, rust)")
 
 	policyCmd.AddCommand(policyListCmd, policyFetchCmd, policyClearCmd)
-	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, presetsCmd, policyCmd, versionCmd, validateCmd)
+	cacheCmd.AddCommand(cacheClearCmd)
+	rootCmd.AddCommand(installCmd, uninstallCmd, runCmd, runCmdCmd, listCmd, doctorCmd, initCmd, presetsCmd, policyCmd, versionCmd, validateCmd, cacheCmd)
 }
 
 func Execute() error {
@@ -287,6 +301,24 @@ func runHook(cmd *cobra.Command, args []string) error {
 		color.NoColor = true
 	}
 
+	if useCache {
+		gitignorePath := filepath.Join(workDir, ".gitignore")
+		data, err := os.ReadFile(gitignorePath)
+		if err != nil || !strings.Contains(string(data), ".hookrunner") {
+			f, ferr := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if ferr == nil {
+				if len(data) > 0 && data[len(data)-1] != '\n' {
+					f.WriteString("\n")
+				}
+				f.WriteString(".hookrunner/\n")
+				f.Close()
+				if !quiet {
+					fmt.Println("Added '.hookrunner/' to .gitignore")
+				}
+			}
+		}
+	}
+
 	opts := executor.Options{
 		Verbose:   verbose,
 		Quiet:     quiet,
@@ -294,6 +326,7 @@ func runHook(cmd *cobra.Command, args []string) error {
 		FailFast:  !noFailFast,
 		DryRun:    dryRun,
 		NoColor:   noColor,
+		UseCache:  useCache,
 		SkipHooks: executor.ParseSkipEnv(),
 	}
 	exec.SetOptions(opts)
@@ -715,6 +748,29 @@ func runPolicyClearCache(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("Policy cache cleared")
+	return nil
+}
+
+func runCacheClear(cmd *cobra.Command, args []string) error {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	cfg, _, err := config.Load(workDir)
+	if err != nil {
+		cfg = &config.Config{}
+	}
+
+	cacheDir := filepath.Join(workDir, ".hooks", "cache")
+	toolMgr := tool.NewManager(cacheDir)
+	exec := executor.New(cfg, toolMgr, workDir)
+
+	if err := exec.ClearCache(); err != nil {
+		return fmt.Errorf("failed to clear hook cache: %w", err)
+	}
+
+	fmt.Println("Hook cache cleared")
 	return nil
 }
 

@@ -390,6 +390,7 @@ Level 3:    [integration]
 | `policy list` | Show configured policies |
 | `policy fetch` | Refresh remote policies |
 | `policy clear-cache` | Clear cached policies |
+| `cache clear` | Clear hook result cache |
 | `version` | Display version information |
 
 ### Run Flags
@@ -403,6 +404,7 @@ Level 3:    [integration]
 | `--quiet` | Suppress output except errors |
 | `--dry-run` | Show what would run without executing |
 | `--clean-room` | Run hooks in an isolated temp directory with only staged files (CI parity) |
+| `--cached` | Skip hooks for unchanged files (incremental runs) |
 
 
 ### Environment Variables

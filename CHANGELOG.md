@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Hook Caching** (`--cached`) - Skip hooks for unchanged files
+  - SHA256-based file content hashing
+  - Cache stored in `.hookrunner/cache/`
+  - Auto-adds `.hookrunner/` to `.gitignore`
+  - `hookrunner cache clear` command to reset cache
 - **Lua Policy Scripting** - Write custom policies using embedded Lua scripts
   - Built-in functions: `block()`, `pass()`, `read_file()`, `match()`
   - `check(file, content)` callback for per-file validation

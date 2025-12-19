@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ashavijit/hookrunner/internal/cache"
 	"github.com/ashavijit/hookrunner/internal/config"
 	"github.com/ashavijit/hookrunner/internal/dag"
 	luapkg "github.com/ashavijit/hookrunner/internal/lua"
@@ -36,6 +37,7 @@ type Options struct {
 	DryRun     bool
 	JSONOutput bool
 	NoColor    bool
+	UseCache   bool
 	SkipHooks  []string
 	CommitMsg  string
 }
@@ -45,6 +47,7 @@ type Executor struct {
 	config  *config.Config
 	workDir string
 	opts    Options
+	cache   *cache.Cache
 }
 
 func New(cfg *config.Config, toolMgr *tool.Manager, workDir string) *Executor {
@@ -53,6 +56,7 @@ func New(cfg *config.Config, toolMgr *tool.Manager, workDir string) *Executor {
 		config:  cfg,
 		workDir: workDir,
 		opts:    Options{FailFast: true},
+		cache:   cache.New(workDir),
 	}
 }
 
@@ -365,13 +369,33 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 		return result
 	}
 
+	var matchedFiles []string
 	if !allFiles {
-		matched := e.filterFiles(files, hook)
-		if len(matched) == 0 {
+		matchedFiles = e.filterFiles(files, hook)
+		if len(matchedFiles) == 0 {
 			result.Skipped = true
 			result.Success = true
 			result.Duration = time.Since(start)
 			result.Output = "skipped (no matching files)"
+			return result
+		}
+	} else {
+		matchedFiles = files
+	}
+
+	hookHash := cache.ComputeHookHash(hook.Tool, hook.Args, hook.Files, hook.Glob, hook.Exclude)
+
+	if e.opts.UseCache && len(matchedFiles) > 0 {
+		absFiles := make([]string, len(matchedFiles))
+		for i, f := range matchedFiles {
+			absFiles[i] = filepath.Join(e.workDir, f)
+		}
+		cached, uncached := e.cache.IsCached(hook.Name, absFiles, hookHash)
+		if len(uncached) == 0 && len(cached) > 0 {
+			result.Skipped = true
+			result.Success = true
+			result.Duration = time.Since(start)
+			result.Output = fmt.Sprintf("cached (%d files)", len(cached))
 			return result
 		}
 	}
@@ -448,10 +472,26 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 
 	if err != nil {
 		result.Error = err
+		if e.opts.UseCache && len(matchedFiles) > 0 {
+			absFiles := make([]string, len(matchedFiles))
+			for i, f := range matchedFiles {
+				absFiles[i] = filepath.Join(e.workDir, f)
+			}
+			e.cache.Invalidate(hook.Name, absFiles, hookHash)
+		}
 		return result
 	}
 
 	result.Success = true
+
+	if e.opts.UseCache && len(matchedFiles) > 0 {
+		absFiles := make([]string, len(matchedFiles))
+		for i, f := range matchedFiles {
+			absFiles[i] = filepath.Join(e.workDir, f)
+		}
+		e.cache.MarkPassed(hook.Name, absFiles, hookHash)
+	}
+
 	return result
 }
 
@@ -601,4 +641,8 @@ func ParseSkipEnv() []string {
 		return nil
 	}
 	return strings.Split(skip, ",")
+}
+
+func (e *Executor) ClearCache() error {
+	return e.cache.Clear()
 }

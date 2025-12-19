@@ -32,7 +32,7 @@ func TestIsCached_Empty(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	os.WriteFile(testFile, []byte("package main"), 0644)
+	_ = os.WriteFile(testFile, []byte("package main"), 0644)
 
 	cached, uncached := c.IsCached("lint", []string{testFile}, "abc123")
 
@@ -49,7 +49,7 @@ func TestMarkPassed_ThenCached(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	os.WriteFile(testFile, []byte("package main"), 0644)
+	_ = os.WriteFile(testFile, []byte("package main"), 0644)
 
 	hookHash := ComputeHookHash("go", []string{"fmt"}, "", "", "")
 
@@ -73,11 +73,11 @@ func TestInvalidate(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	os.WriteFile(testFile, []byte("package main"), 0644)
+	_ = os.WriteFile(testFile, []byte("package main"), 0644)
 
 	hookHash := "abc123"
-	c.MarkPassed("lint", []string{testFile}, hookHash)
-	c.Invalidate("lint", []string{testFile}, hookHash)
+	_ = c.MarkPassed("lint", []string{testFile}, hookHash)
+	_ = c.Invalidate("lint", []string{testFile}, hookHash)
 
 	cached, _ := c.IsCached("lint", []string{testFile}, hookHash)
 	if len(cached) != 0 {
@@ -90,10 +90,10 @@ func TestClear(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	os.WriteFile(testFile, []byte("package main"), 0644)
+	_ = os.WriteFile(testFile, []byte("package main"), 0644)
 
-	c.MarkPassed("lint", []string{testFile}, "abc")
-	c.Clear()
+	_ = c.MarkPassed("lint", []string{testFile}, "abc")
+	_ = c.Clear()
 
 	if _, err := os.Stat(c.dir); !os.IsNotExist(err) {
 		t.Error("cache dir should not exist after clear")
@@ -105,12 +105,12 @@ func TestFileChange_InvalidatesCache(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	os.WriteFile(testFile, []byte("package main"), 0644)
+	_ = os.WriteFile(testFile, []byte("package main"), 0644)
 
 	hookHash := "abc123"
-	c.MarkPassed("lint", []string{testFile}, hookHash)
+	_ = c.MarkPassed("lint", []string{testFile}, hookHash)
 
-	os.WriteFile(testFile, []byte("package main // modified"), 0644)
+	_ = os.WriteFile(testFile, []byte("package main // modified"), 0644)
 
 	cached, uncached := c.IsCached("lint", []string{testFile}, hookHash)
 	if len(cached) != 0 {

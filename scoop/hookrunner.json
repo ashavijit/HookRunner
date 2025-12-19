@@ -1,0 +1,31 @@
+{
+    "version": "0.45.0",
+    "description": "Cross-platform pre-commit hook system with DAG execution, policy engine, and Lua scripting",
+    "homepage": "https://github.com/ashavijit/HookRunner",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/ashavijit/HookRunner/releases/download/v0.45.0/hookrunner-windows-amd64.exe#/hookrunner.exe",
+            "hash": "716F37EE95D5978D9F2BE2A6546738D0688FA58CB09F6BAE5804C7334392634E"
+        },
+        "arm64": {
+            "url": "https://github.com/ashavijit/HookRunner/releases/download/v0.45.0/hookrunner-windows-arm64.exe#/hookrunner.exe",
+            "hash": "8FDFF47DE438066BCC77F88D1031A9FF8BA530C97DD078CADDD73063074FDADA"
+        }
+    },
+    "bin": "hookrunner.exe",
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/ashavijit/HookRunner/releases/download/v$version/hookrunner-windows-amd64.exe#/hookrunner.exe"
+            },
+            "arm64": {
+                "url": "https://github.com/ashavijit/HookRunner/releases/download/v$version/hookrunner-windows-arm64.exe#/hookrunner.exe"
+            }
+        },
+        "hash": {
+            "url": "$url.sha256"
+        }
+    }
+}

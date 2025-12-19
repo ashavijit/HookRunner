@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>hookrunner</id>
+    <version>0.45.0</version>
+    <title>HookRunner</title>
+    <authors>Avijit Sen</authors>
+    <owners>ashavijit</owners>
+    <projectUrl>https://github.com/ashavijit/HookRunner</projectUrl>
+    <licenseUrl>https://github.com/ashavijit/HookRunner/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Cross-platform pre-commit hook system with DAG execution, policy engine, and Lua scripting. Features include parallel hook execution, remote policy support, caching, and clean-room mode for CI-like local testing.</description>
+    <summary>Cross-platform pre-commit hook system</summary>
+    <releaseNotes>https://github.com/ashavijit/HookRunner/releases/tag/v0.45.0</releaseNotes>
+    <tags>git hooks pre-commit developer-tools cli automation linting code-quality</tags>
+    <packageSourceUrl>https://github.com/ashavijit/HookRunner</packageSourceUrl>
+    <docsUrl>https://github.com/ashavijit/HookRunner#readme</docsUrl>
+    <bugTrackerUrl>https://github.com/ashavijit/HookRunner/issues</bugTrackerUrl>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

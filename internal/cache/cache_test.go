@@ -32,7 +32,7 @@ func TestIsCached_Empty(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -51,7 +51,7 @@ func TestMarkPassed_ThenCached(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -77,7 +77,7 @@ func TestInvalidate(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,7 +100,7 @@ func TestClear(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -121,7 +121,7 @@ func TestFileChange_InvalidatesCache(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,7 +130,7 @@ func TestFileChange_InvalidatesCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(testFile, []byte("package main // modified"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main // modified"), 0600); err != nil {
 		t.Fatal(err)
 	}
 

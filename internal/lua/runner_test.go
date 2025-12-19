@@ -25,12 +25,12 @@ func TestRunPolicy_PassingScript(t *testing.T) {
 function check(file, content)
 	return true, ""
 end
-`), 0644); err != nil {
+`), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -53,12 +53,12 @@ func TestRunPolicy_FailingScript(t *testing.T) {
 function check(file, content)
 	return false, "test violation"
 end
-`), 0644); err != nil {
+`), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("package main"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -80,7 +80,7 @@ func TestRunPolicy_BlockFunction(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "block.lua")
-	if err := os.WriteFile(scriptPath, []byte(`block("blocked message", "file.go")`), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(`block("blocked message", "file.go")`), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +102,7 @@ func TestRunPolicy_InvalidScript(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "invalid.lua")
-	if err := os.WriteFile(scriptPath, []byte(`invalid lua syntax !!!`), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(`invalid lua syntax !!!`), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -125,7 +125,7 @@ func TestRunScript_Simple(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "simple.lua")
-	if err := os.WriteFile(scriptPath, []byte(`local x = 1 + 1`), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(`local x = 1 + 1`), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +140,7 @@ func TestRunScript_Invalid(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "bad.lua")
-	if err := os.WriteFile(scriptPath, []byte(`syntax error !!!`), 0644); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(`syntax error !!!`), 0600); err != nil {
 		t.Fatal(err)
 	}
 

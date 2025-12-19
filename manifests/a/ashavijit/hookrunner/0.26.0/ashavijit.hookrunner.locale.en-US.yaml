@@ -1,0 +1,38 @@
+# Created using winget CLI
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+
+PackageIdentifier: ashavijit.hookrunner
+PackageVersion: 0.26.0
+PackageLocale: en-US
+Publisher: Avijit Sen
+PublisherUrl: https://github.com/ashavijit
+PublisherSupportUrl: https://github.com/ashavijit/HookRunner/issues
+Author: Avijit Sen
+PackageName: HookRunner
+PackageUrl: https://github.com/ashavijit/HookRunner
+License: MIT
+LicenseUrl: https://github.com/ashavijit/HookRunner/blob/master/LICENSE
+Copyright: Copyright (c) 2024 Avijit Sen
+ShortDescription: Cross-platform pre-commit hook system with DAG execution, policy engine, and Lua scripting
+Description: |-
+  HookRunner is a powerful, cross-platform pre-commit hook system featuring:
+  - DAG-based parallel hook execution
+  - Policy engine with remote policy support
+  - Lua scripting for custom policies
+  - Clean-room mode for CI-like local testing
+  - Built-in caching for fast re-runs
+  - Support for Go, Node.js, Python, Java, Ruby, and Rust
+Moniker: hookrunner
+Tags:
+  - git
+  - hooks
+  - pre-commit
+  - developer-tools
+  - cli
+  - golang
+  - automation
+  - linting
+  - code-quality
+ReleaseNotesUrl: https://github.com/ashavijit/HookRunner/releases/tag/v0.26.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

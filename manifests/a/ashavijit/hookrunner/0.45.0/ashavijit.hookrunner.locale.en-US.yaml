@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
 PackageIdentifier: ashavijit.hookrunner
-PackageVersion: 0.26.0
+PackageVersion: 0.45.0
 PackageLocale: en-US
 Publisher: Avijit Sen
 PublisherUrl: https://github.com/ashavijit
@@ -33,6 +33,6 @@ Tags:
   - automation
   - linting
   - code-quality
-ReleaseNotesUrl: https://github.com/ashavijit/HookRunner/releases/tag/v0.26.0
+ReleaseNotesUrl: https://github.com/ashavijit/HookRunner/releases/tag/v0.45.0
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

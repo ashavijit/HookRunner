@@ -21,14 +21,18 @@ func TestRunPolicy_PassingScript(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "pass.lua")
-	_ = os.WriteFile(scriptPath, []byte(`
+	if err := os.WriteFile(scriptPath, []byte(`
 function check(file, content)
 	return true, ""
 end
-`), 0644)
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	_ = os.WriteFile(testFile, []byte("package main"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	results, err := r.RunPolicy(scriptPath, []string{"test.go"})
 	if err != nil {
@@ -45,14 +49,18 @@ func TestRunPolicy_FailingScript(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "fail.lua")
-	_ = os.WriteFile(scriptPath, []byte(`
+	if err := os.WriteFile(scriptPath, []byte(`
 function check(file, content)
 	return false, "test violation"
 end
-`), 0644)
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	_ = os.WriteFile(testFile, []byte("package main"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	results, err := r.RunPolicy(scriptPath, []string{"test.go"})
 	if err != nil {
@@ -72,7 +80,9 @@ func TestRunPolicy_BlockFunction(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "block.lua")
-	_ = os.WriteFile(scriptPath, []byte(`block("blocked message", "file.go")`), 0644)
+	if err := os.WriteFile(scriptPath, []byte(`block("blocked message", "file.go")`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	results, err := r.RunPolicy(scriptPath, []string{})
 	if err != nil {
@@ -92,7 +102,9 @@ func TestRunPolicy_InvalidScript(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "invalid.lua")
-	_ = os.WriteFile(scriptPath, []byte(`invalid lua syntax !!!`), 0644)
+	if err := os.WriteFile(scriptPath, []byte(`invalid lua syntax !!!`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := r.RunPolicy(scriptPath, []string{})
 	if err == nil {
@@ -113,7 +125,9 @@ func TestRunScript_Simple(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "simple.lua")
-	_ = os.WriteFile(scriptPath, []byte(`local x = 1 + 1`), 0644)
+	if err := os.WriteFile(scriptPath, []byte(`local x = 1 + 1`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	err := r.RunScript(scriptPath)
 	if err != nil {
@@ -126,7 +140,9 @@ func TestRunScript_Invalid(t *testing.T) {
 	r := NewRunner(tmpDir)
 
 	scriptPath := filepath.Join(tmpDir, "bad.lua")
-	_ = os.WriteFile(scriptPath, []byte(`syntax error !!!`), 0644)
+	if err := os.WriteFile(scriptPath, []byte(`syntax error !!!`), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	err := r.RunScript(scriptPath)
 	if err == nil {

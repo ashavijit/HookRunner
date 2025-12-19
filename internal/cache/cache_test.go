@@ -32,7 +32,9 @@ func TestIsCached_Empty(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	_ = os.WriteFile(testFile, []byte("package main"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cached, uncached := c.IsCached("lint", []string{testFile}, "abc123")
 
@@ -49,7 +51,9 @@ func TestMarkPassed_ThenCached(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	_ = os.WriteFile(testFile, []byte("package main"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	hookHash := ComputeHookHash("go", []string{"fmt"}, "", "", "")
 
@@ -73,11 +77,17 @@ func TestInvalidate(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	_ = os.WriteFile(testFile, []byte("package main"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	hookHash := "abc123"
-	_ = c.MarkPassed("lint", []string{testFile}, hookHash)
-	_ = c.Invalidate("lint", []string{testFile}, hookHash)
+	if err := c.MarkPassed("lint", []string{testFile}, hookHash); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Invalidate("lint", []string{testFile}, hookHash); err != nil {
+		t.Fatal(err)
+	}
 
 	cached, _ := c.IsCached("lint", []string{testFile}, hookHash)
 	if len(cached) != 0 {
@@ -90,10 +100,16 @@ func TestClear(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	_ = os.WriteFile(testFile, []byte("package main"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
-	_ = c.MarkPassed("lint", []string{testFile}, "abc")
-	_ = c.Clear()
+	if err := c.MarkPassed("lint", []string{testFile}, "abc"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Clear(); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := os.Stat(c.dir); !os.IsNotExist(err) {
 		t.Error("cache dir should not exist after clear")
@@ -105,12 +121,18 @@ func TestFileChange_InvalidatesCache(t *testing.T) {
 	c := New(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test.go")
-	_ = os.WriteFile(testFile, []byte("package main"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	hookHash := "abc123"
-	_ = c.MarkPassed("lint", []string{testFile}, hookHash)
+	if err := c.MarkPassed("lint", []string{testFile}, hookHash); err != nil {
+		t.Fatal(err)
+	}
 
-	_ = os.WriteFile(testFile, []byte("package main // modified"), 0644)
+	if err := os.WriteFile(testFile, []byte("package main // modified"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cached, uncached := c.IsCached("lint", []string{testFile}, hookHash)
 	if len(cached) != 0 {

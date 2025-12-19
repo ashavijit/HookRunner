@@ -477,7 +477,7 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 			for i, f := range matchedFiles {
 				absFiles[i] = filepath.Join(e.workDir, f)
 			}
-			_ = e.cache.Invalidate(hook.Name, absFiles, hookHash)
+			_ = e.cache.Invalidate(hook.Name, absFiles, hookHash) //nolint:errcheck // best-effort cache invalidation
 		}
 		return result
 	}
@@ -489,7 +489,7 @@ func (e *Executor) runHook(hook config.Hook, files []string, allFiles bool) Resu
 		for i, f := range matchedFiles {
 			absFiles[i] = filepath.Join(e.workDir, f)
 		}
-		_ = e.cache.MarkPassed(hook.Name, absFiles, hookHash)
+		_ = e.cache.MarkPassed(hook.Name, absFiles, hookHash) //nolint:errcheck // best-effort cache update
 	}
 
 	return result

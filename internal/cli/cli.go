@@ -308,9 +308,9 @@ func runHook(cmd *cobra.Command, args []string) error {
 			f, ferr := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if ferr == nil {
 				if len(data) > 0 && data[len(data)-1] != '\n' {
-					_, _ = f.WriteString("\n")
+					_, _ = f.WriteString("\n") //nolint:errcheck // best-effort gitignore update
 				}
-				_, _ = f.WriteString(".hookrunner/\n")
+				_, _ = f.WriteString(".hookrunner/\n") //nolint:errcheck // best-effort gitignore update
 				f.Close()
 				if !quiet {
 					fmt.Println("Added '.hookrunner/' to .gitignore")

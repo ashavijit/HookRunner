@@ -241,6 +241,9 @@ func TestResult_Fields(t *testing.T) {
 	if !r.Success {
 		t.Error("Success should be true")
 	}
+	if r.Skipped {
+		t.Error("Skipped should be false")
+	}
 }
 
 func TestOptions_Fields(t *testing.T) {

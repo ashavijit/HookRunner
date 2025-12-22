@@ -304,6 +304,7 @@ func convertRules(r config.PolicyRules) policy.PolicyRules {
 		MaxFileSizeKB:        r.MaxFileSizeKB,
 		MaxFilesChanged:      r.MaxFilesChanged,
 		ForbidFileContent:    patterns,
+		ExcludeExtensions:    r.ExcludeExtensions,
 		CommitMessage:        cm,
 		EnforceHooks:         r.EnforceHooks,
 		HookTimeBudgetMs:     r.HookTimeBudgetMs,

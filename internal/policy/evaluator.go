@@ -106,6 +106,9 @@ func Evaluate(rules *PolicyRules, files []string, commitMsg string) EvalResult {
 			continue
 		}
 		for _, file := range files {
+			if isExcludedExtension(file, rules.ExcludeExtensions) {
+				continue
+			}
 			content, err := os.ReadFile(file)
 			if err != nil {
 				continue
@@ -123,13 +126,15 @@ func Evaluate(rules *PolicyRules, files []string, commitMsg string) EvalResult {
 		}
 	}
 
-	// Check regex_block patterns (from remote policies)
 	for _, pattern := range rules.RegexBlock {
 		re, err := regexp.Compile(pattern)
 		if err != nil {
 			continue
 		}
 		for _, file := range files {
+			if isExcludedExtension(file, rules.ExcludeExtensions) {
+				continue
+			}
 			content, err := os.ReadFile(file)
 			if err != nil {
 				continue
@@ -165,6 +170,15 @@ func Evaluate(rules *PolicyRules, files []string, commitMsg string) EvalResult {
 	return result
 }
 
+func isExcludedExtension(file string, excludeExtensions []string) bool {
+	for _, ext := range excludeExtensions {
+		if strings.HasSuffix(file, ext) || strings.HasSuffix(file, "."+ext) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r EvalResult) String() string {
 	if r.Passed {
 		return "All policies passed"
@@ -178,7 +192,6 @@ func (r EvalResult) String() string {
 	return sb.String()
 }
 
-// describeSecretPattern returns a user-friendly description for common secret patterns
 func describeSecretPattern(pattern string) string {
 	descriptions := map[string]string{
 		"AKIA[0-9A-Z]{16}":            "AWS Access Key",
@@ -198,6 +211,5 @@ func describeSecretPattern(pattern string) string {
 		return desc + " detected"
 	}
 
-	// For unknown patterns, provide a generic but clear message
 	return "Potential secret/credential detected"
 }

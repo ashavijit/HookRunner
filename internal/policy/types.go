@@ -47,6 +47,7 @@ type PolicyRules struct {
 	MaxFilesChanged      int                       `json:"max_files_changed" yaml:"max_files_changed"`
 	ForbidFileContent    []ForbiddenContentPattern `json:"forbid_file_content" yaml:"forbid_file_content"`
 	RegexBlock           []string                  `json:"regex_block" yaml:"regex_block"`
+	ExcludeExtensions    []string                  `json:"exclude_extensions" yaml:"exclude_extensions"`
 	CommitMessage        *CommitMessageRule        `json:"commit_message" yaml:"commit_message"`
 	EnforceHooks         []string                  `json:"enforce_hooks" yaml:"enforce_hooks"`
 	HookTimeBudgetMs     map[string]int            `json:"hook_time_budget_ms" yaml:"hook_time_budget_ms"`
@@ -92,6 +93,7 @@ func (r *PolicyRules) Merge(other PolicyRules) PolicyRules {
 	result.RequiredFiles = appendUnique(result.RequiredFiles, other.RequiredFiles)
 	result.EnforceHooks = appendUnique(result.EnforceHooks, other.EnforceHooks)
 	result.RegexBlock = appendUnique(result.RegexBlock, other.RegexBlock)
+	result.ExcludeExtensions = appendUnique(result.ExcludeExtensions, other.ExcludeExtensions)
 
 	result.ForbidFileContent = append(result.ForbidFileContent, other.ForbidFileContent...)
 

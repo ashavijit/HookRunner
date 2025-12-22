@@ -1,0 +1,35 @@
+name: "hookrunner"
+arch: "amd64"
+platform: "linux"
+version: "0.45.0"
+section: "default"
+priority: "extra"
+replaces:
+- hookrunner
+provides:
+- hookrunner
+maintainer: "Avijit Sen <ashavijit@github.com>"
+description: |
+  Cross-platform pre-commit hook system with DAG execution, policy engine, and Lua scripting.
+  Features include parallel hook execution, remote policy support, and caching.
+vendor: "ashavijit"
+homepage: "https://github.com/ashavijit/HookRunner"
+license: "MIT"
+contents:
+- src: ./dist/hookrunner-linux-amd64
+  dst: /usr/bin/hookrunner
+  type: file
+  file_info:
+    mode: 0755
+- src: ./LICENSE
+  dst: /usr/share/doc/hookrunner/copyright
+  type: file
+overrides:
+  deb:
+    scripts:
+      postinstall: ./scripts/postinstall.sh
+      preremove: ./scripts/preremove.sh
+  rpm:
+    scripts:
+      postinstall: ./scripts/postinstall.sh
+      preremove: ./scripts/preremove.sh

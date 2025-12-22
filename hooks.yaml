@@ -22,6 +22,12 @@ policies:
         forbid_file_extensions:
           - .exe
           - .dll
+        exclude_extensions:
+          - .md
+          - .txt
+          - .json
+          - .yaml
+          - .yml
         commit_message:
           regex: "^(feat|fix|chore|docs|refactor|test|build|ci):"
           error: "Commit must follow conventional format (feat|fix|chore|docs|refactor|test|build|ci):"

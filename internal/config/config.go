@@ -62,6 +62,7 @@ type PolicyRules struct {
 	MaxFileSizeKB        int                       `yaml:"max_file_size_kb" json:"max_file_size_kb"`
 	MaxFilesChanged      int                       `yaml:"max_files_changed" json:"max_files_changed"`
 	ForbidFileContent    []ForbiddenContentPattern `yaml:"forbid_file_content" json:"forbid_file_content"`
+	ExcludeExtensions    []string                  `yaml:"exclude_extensions" json:"exclude_extensions"`
 	CommitMessage        *CommitMessageRule        `yaml:"commit_message" json:"commit_message"`
 	EnforceHooks         []string                  `yaml:"enforce_hooks" json:"enforce_hooks"`
 	HookTimeBudgetMs     map[string]int            `yaml:"hook_time_budget_ms" json:"hook_time_budget_ms"`

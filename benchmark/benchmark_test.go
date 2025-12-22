@@ -17,7 +17,7 @@ func createDummyFiles(dir string, count int) ([]string, error) {
 		name := fmt.Sprintf("file_%d.go", i)
 		path := filepath.Join(dir, name)
 		content := fmt.Sprintf("package main\n\nfunc Foo%d() {}\n", i)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 			return nil, err
 		}
 		files = append(files, name)
